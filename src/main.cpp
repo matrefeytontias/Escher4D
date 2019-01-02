@@ -112,7 +112,7 @@ int _main(int, char *argv[])
     glEnable(GL_DEPTH_TEST);
     
     Camera4 camera(window);
-    camera.pos << 0, 1, 3, 0;
+    camera.pos << 0, 1.5, 3, 0;
     
     Eigen::Matrix4f p(Eigen::Matrix4f::Identity());
     ShaderProgram cubeProgram;
@@ -162,6 +162,10 @@ int _main(int, char *argv[])
     
     while (!glfwWindowShouldClose(window))
     {
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        setAspectRatio(p, (float)display_w / display_h);
+        
         float now = glfwGetTime(), dt = now - timeBase;
         timeBase = now;
         ImGui_ImplGlfwGL3_NewFrame();

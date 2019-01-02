@@ -87,7 +87,7 @@ void perspective(Eigen::Matrix4f &p, float fov, float ratio, float near, float f
 
 void setAspectRatio(Eigen::Matrix4f &p, float ratio)
 {
-    p(1, 1) = p(0, 0) * ratio;
+    p(1, 1) = -p(0, 0) * ratio;
 }
 
 void displayTexture(GLint texture, float dx, float dy)
