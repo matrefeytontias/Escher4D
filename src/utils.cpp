@@ -1,5 +1,6 @@
 #include "utils.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -26,7 +27,7 @@ void setwd(char **argv)
     delete[] buf;
 }
 
-std::string getFileContents(const char *path)
+std::string getFileContents(const std::string &path)
 {
     std::ifstream ifs;
     ifs.open(path, std::ios_base::in | std::ios_base::binary);
@@ -36,7 +37,28 @@ std::string getFileContents(const char *path)
     return contents;
 }
 
-GLuint createShaderFromSource(GLenum type, const char *path)
+std::vector<std::string> split(const std::string &s, const std::string &delim)
+{
+    std::vector<std::string> r;
+    size_t index = 0;
+    while(index < s.size())
+    {
+        size_t minSplitting = s.size();
+        for(char c : delim)
+        {
+            size_t splitting = s.find(c, index);
+            if(splitting < minSplitting)
+                minSplitting = splitting;
+        }
+        r.push_back(s.substr(index, minSplitting - index));
+        index = minSplitting + 1;
+    }
+    
+    std::remove_if(r.begin(), r.end(), [](std::string &s) { return !s.size(); });
+    return r;
+}
+
+GLuint createShaderFromSource(GLenum type, const std::string &path)
 {
     GLuint shader = glCreateShader(type);
     std::string source = getFileContents(path);

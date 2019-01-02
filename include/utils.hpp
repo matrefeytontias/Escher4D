@@ -18,14 +18,19 @@ void setwd(char **argv);
  * Returns the contents of a file as a string. Raises a runtime_error exception
  * upon failure.
  */
-std::string getFileContents(const char *path);
+std::string getFileContents(const std::string &path);
+/**
+ * Splits a string on delimiting characters. The delimiting characters are a disjunction,
+ * meaning either of the characters in the delimiter string is to split the string.
+ */
+std::vector<std::string> split(const std::string &s, const std::string &delim);
 /**
  * Creates an OpenGL shader from the path of its source file.
  * @param   type    the OpenGL type of the shader (eg vertex, fragment ...)
  * @param   path    the path of the source file
  * @return  a valid OpenGL shader name
  */
-GLuint createShaderFromSource(GLenum type, const char *path);
+GLuint createShaderFromSource(GLenum type, const std::string &path);
 
 /**
  * Print the shader log associated with a shader name.
