@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <vector>
 
 #include <Eigen/Eigen>
@@ -139,6 +140,28 @@ struct Geometry4
         
         for(Vector4f &v : normals)
             v.normalize();
+    }
+    
+    /**
+     * Computes the barycenter of the geometry.
+     */
+    Vector4f barycenter() const
+    {
+        Vector4f z = Vector4f::Zero();
+        return accumulate(vertices.begin(), vertices.end(), z) / vertices.size();
+    }
+    
+    /**
+     * Computes the bounding box of the geometry.
+     */
+    void boundingBox(Vector4f &min, Vector4f &max)
+    {
+        min = max = vertices[0];
+        for(Vector4f &v : vertices)
+        {
+            min = v.array().min(min.array()).matrix();
+            max = v.array().max(max.array()).matrix();
+        }
     }
     
     /**
