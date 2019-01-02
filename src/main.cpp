@@ -183,23 +183,26 @@ int _main(int, char *argv[])
         scene.render(camera);
         
         ImGui::Begin("Test parameters", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-        if(ImGui::TreeNode("Lighting parameters"))
-        {
-            ImGui::SliderFloat("Light intensity", &lightIntensity, 0, 20);
-            ImGui::SliderFloat("Light radius", &lightRadius, 1, 50);
-            ImGui::TreePop();
-        }
-        if(ImGui::TreeNode("Camera control"))
-        {
-            ImGui::SliderFloat("Movement speed", &camera.speed, 1, 10);
-            ImGui::SliderFloat("Rotation divisor X", &camera.rotationDivisorX, 1, display_w);
-            ImGui::SliderFloat("Rotation divisor Y", &camera.rotationDivisorY, 1, display_h);
-            ImGui::SliderFloat("XW rotation speed", &camera.xwSpeed, 0.1, (float)M_PI * 2);
-            ImGui::Separator();
+            if(ImGui::TreeNode("Lighting parameters"))
+            {
+                ImGui::SliderFloat("Light intensity", &lightIntensity, 0, 20);
+                ImGui::SliderFloat("Light radius", &lightRadius, 1, 50);
+                ImGui::TreePop();
+            }
+            if(ImGui::TreeNode("Camera control"))
+            {
+                ImGui::SliderFloat("Movement speed", &camera.speed, 1, 10);
+                ImGui::SliderFloat("Rotation divisor X", &camera.rotationDivisorX, 1, display_w);
+                ImGui::SliderFloat("Rotation divisor Y", &camera.rotationDivisorY, 1, display_h);
+                ImGui::SliderFloat("XW rotation speed", &camera.xwSpeed, 0.1, (float)M_PI * 2);
+                ImGui::TreePop();
+            }
+        ImGui::End();
+        
+        ImGui::Begin("Positional info", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::Text("Camera position : %lf, %lf, %lf, %lf",
                 camera.pos(0), camera.pos(1), camera.pos(2), camera.pos(3));
-            ImGui::TreePop();
-        }
+            ImGui::Text("Camera rotation : %lf, %lf, %lf", camera._xz, camera._yz, camera._zw);
         ImGui::End();
                 
         ImGui::Render();

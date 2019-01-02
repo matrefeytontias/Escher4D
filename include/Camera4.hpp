@@ -8,7 +8,7 @@
 
 using namespace Eigen;
 
-struct Camera4 : Transform4
+struct Camera4 : private Transform4
 {
     Camera4(GLFWwindow *window) : Transform4(), _window(window)
     {
@@ -75,6 +75,7 @@ struct Camera4 : Transform4
     float xwSpeed = 1.;
     
 private:
+    friend int _main(int argc, char *argv[]);
     // window that the camera is attached to
     GLFWwindow *_window;
     // Mouse position on the previous frame
