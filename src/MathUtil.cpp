@@ -1,5 +1,11 @@
 #include "MathUtil.hpp"
 
+#include <algorithm>
+#include <iterator>
+#include <vector>
+
+#include <Eigen/Eigen>
+
 using namespace Eigen;
 
 Vector4f MathUtil::cross4(const Vector4f &v1, const Vector4f &v2, const Vector4f &v3)
@@ -15,4 +21,10 @@ Vector4f MathUtil::cross4(const Vector4f &v1, const Vector4f &v2, const Vector4f
     v(2) = xyw(v3).dot(xyw(v1).cross(xyw(v2)));
     v(3) = -xyz(v3).dot(xyz(v1).cross(xyz(v2)));
     return v;
+}
+
+std::vector<Vector4f>::iterator MathUtil::nearestPoint(const Vector4f &v, std::vector<Vector4f> &vs)
+{
+    return std::min_element(vs.begin(), vs.end(), [&v](Vector4f &v1, Vector4f &v2)
+    { return (v - v1).squaredNorm() < (v - v2).squaredNorm(); });
 }

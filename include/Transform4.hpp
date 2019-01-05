@@ -62,6 +62,12 @@ struct Transform4
         return *this;
     }
     
+    Transform4 &scale(float factor)
+    {
+        mat *= factor;
+        return *this;
+    }
+    
     /**
      * Appends a rotation to the current transform.
      * @param   p       plane of rotation

@@ -80,6 +80,7 @@ struct Geometry4
      */
     void recomputeNormals(bool inwards = false)
     {
+        static Vector4f zero = Vector4f::Zero();
         normals.clear();
         
         // If the mesh is indexed, use solid angle weighting
@@ -94,9 +95,11 @@ struct Geometry4
                 float paraVolume = cellN.norm();
                 auto sdist = [&](int i, int j) { return (vertices[cell[i % 4]] - vertices[cell[j % 4]]).squaredNorm(); };
                 
-                // Convex hypothesis
-                // TODO : replace with skeleton
-                if((cellN.dot(vertices[cell[0]]) < 0) != inwards)
+                // Skeleton checking for normal vector orientation
+                Vector4f &checker = zero;
+                if(skeleton.size() > 0)
+                    checker = *MathUtil::nearestPoint(vertices[cell[0]], skeleton);
+                if((cellN.dot(vertices[cell[0]] - checker) < 0) != inwards)
                 {
                     std::swap(cell[2], cell[3]);
                     cellN *= -1;
@@ -123,9 +126,11 @@ struct Geometry4
                 Vector4f n = MathUtil::cross4(vertices[i + 1] - vertices[i], vertices[i + 2] - vertices[i],
                     vertices[i + 3] - vertices[i]);
                 
-                // Convex hypothesis
-                // TODO : replace with skeleton
-                if((n.dot(vertices[i]) < 0) != inwards)
+                // Skeleton checking for normal vector orientation
+                Vector4f &checker = zero;
+                if(skeleton.size() > 0)
+                    checker = *MathUtil::nearestPoint(vertices[i], skeleton);
+                if((n.dot(vertices[i] - checker) < 0) != inwards)
                 {
                     std::swap(vertices[i + 2], vertices[i + 3]);
                     n *= -1;
@@ -229,6 +234,10 @@ struct Geometry4
      * Vertices of the geomtry.
      */
     vector<Vector4f> vertices;
+    /**
+     * Optional skeleton used for normal vector orientation.
+     */
+    vector<Vector4f> skeleton;
     /**
      * Cell indices. Cells are tetrahedra living in 4-space.
      */

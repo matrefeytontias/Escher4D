@@ -81,8 +81,8 @@ int _main(int, char *argv[])
     glEnable(GL_DEPTH_TEST);
     
     Camera4 camera(window);
-    // camera.pos << 0, 1.5, 3, 0;
-    camera.pos(2) = 5;
+    camera.pos << 0, 1.5, 3, 0;
+    // camera.pos(2) = 5;
     
     Eigen::Matrix4f p(Eigen::Matrix4f::Identity());
     ShaderProgram program;
@@ -91,7 +91,7 @@ int _main(int, char *argv[])
     program.attach(GL_FRAGMENT_SHADER, "shaders/fragment.glsl");
     std::vector<Eigen::Vector3f> vertices;
     std::vector<unsigned int> tris, tetras;
-    if(!OFFLoader::loadModel("models/socket", vertices, tris, tetras))
+    if(!OFFLoader::loadModel("models/holedCube", vertices, tris, tetras))
     {
         trace("Can't load that shizzle");
         return 0;
@@ -130,7 +130,8 @@ int _main(int, char *argv[])
     scene.add(wall).add(noCube).add(yesCube).add(negGround).add(posGround);
     */
     Model4RenderContext obj(geometry, program);
-    obj.scale(Vector4f(0.05, 0.05, 0.05, 1));
+    obj.scale(4);
+    obj.pos(1) = 2;
     obj.color << 1, 1, 1, 1;
     scene.add(obj);
     
