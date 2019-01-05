@@ -16,8 +16,7 @@
 
 #include "Camera4.hpp"
 #include "OFFLoader.hpp"
-#include "Model4RenderContext.hpp"
-#include "ModelGroup.hpp"
+#include "Object4.hpp"
 #include "ShaderProgram.hpp"
 #include "utils.hpp"
 
@@ -81,7 +80,7 @@ int _main(int, char *argv[])
     glEnable(GL_DEPTH_TEST);
     
     Camera4 camera(window);
-    camera.pos << 0, 1.5, 3, 0;
+    camera.pos << 0, 1.5, 0, 0;
     // camera.pos(2) = 5;
     
     Eigen::Matrix4f p(Eigen::Matrix4f::Identity());
@@ -89,51 +88,62 @@ int _main(int, char *argv[])
     program.attach(GL_VERTEX_SHADER, "shaders/vertex.glsl");
     program.attach(GL_GEOMETRY_SHADER, "shaders/geometry.glsl");
     program.attach(GL_FRAGMENT_SHADER, "shaders/fragment.glsl");
+    
+    // Load geometry
     std::vector<Eigen::Vector3f> vertices;
     std::vector<unsigned int> tris, tetras;
+    // Cube
+    if(!OFFLoader::loadModel("models/cube", vertices, tris, tetras))
+    {
+        trace("Can't load that shizzle");
+        return 0;
+    }
+    Geometry4 cubeGeometry = Geometry4::from3D(vertices, tetras);
+    for(unsigned int k = 0; k < cubeGeometry.vertices.size(); k++)
+        cubeGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
+    cubeGeometry.uploadGPU();
+    Model4RenderContext cubeRC(cubeGeometry, program);
+    // Holed cube
     if(!OFFLoader::loadModel("models/holedCube", vertices, tris, tetras))
     {
         trace("Can't load that shizzle");
         return 0;
     }
-    Geometry4 geometry = Geometry4::from3D(vertices, tris, tetras, 1);
-    trace("Model has " << geometry.cells.size() << " tetrahedra in it");
-    geometry.unindex();
-    geometry.recomputeNormals();
-    geometry.uploadGPU();
+    Geometry4 holedGeometry = Geometry4::from3D(vertices, tetras);
+    for(unsigned int k = 0; k < holedGeometry.vertices.size(); k++)
+        holedGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
+    holedGeometry.uploadGPU();
+    Model4RenderContext holedRC(holedGeometry, program);
     
-    // Let's construct the scene
-    ModelGroup scene;
-    /**
-    Model4RenderContext wall(geometry, program);
-    wall.scale(Vector4f(20, 2.5, 1, 1));
-    wall.pos << 0, 1.2, 0, 0;
-    wall.color << 1, 1, 1, 1;
+    // Build the room
+    // 8th cell has a hole in it
+    Object4 room;
+    std::vector<Object4> cells;
+    for(unsigned int k = 0; k < 7; k++)
+        cells.push_back(Object4(cubeRC));
+    cells.push_back(Object4(holedRC));
     
-    Model4RenderContext noCube(geometry, program);
-    noCube.pos << -7, 0.5, 2, 0;
-    noCube.color << 1, 0, 0, 1;
-    Model4RenderContext yesCube(geometry, program);
-    yesCube.pos << -7, 0.5, -6, 0;
-    yesCube.color << 0, 1, 0, 1;
+    for(unsigned int k = 0; k < 8; k++)
+    {
+        room.addChild(&cells[k]);
+        cells[k].color << 1, 1, 1, 1;
+    }
     
-    Model4RenderContext negGround(geometry, program);
-    negGround.scale(Vector4f(20, 1, 20, 10));
-    negGround.pos << 0, -0.5, 0, -5;
-    negGround.color << 0.75, 0.75, 1., 1.;
-    
-    Model4RenderContext posGround(geometry, program);
-    posGround.scale(Vector4f(20, 1, 20, 10));
-    posGround.pos << 0, -0.5, 0, 5;
-    posGround.color << 1, 0.75, 0.75, 1;
-    
-    scene.add(wall).add(noCube).add(yesCube).add(negGround).add(posGround);
-    */
-    Model4RenderContext obj(geometry, program);
-    obj.scale(4);
-    obj.pos(1) = 2;
-    obj.color << 1, 1, 1, 1;
-    scene.add(obj);
+    cells[7].pos(0) = .5;
+    cells[7].rotate(XW, M_PI / 2);
+    cells[0].pos(0) = -.5;
+    cells[0].rotate(XW, -M_PI / 2);
+    cells[1].pos(1) = .5;
+    cells[1].rotate(YW, M_PI / 2);
+    cells[2].pos(1) = -.5;
+    cells[2].rotate(YW, -M_PI / 2);
+    cells[3].pos(2) = .5;
+    cells[3].rotate(ZW, M_PI / 2);
+    cells[4].pos(2) = -.5;
+    cells[4].rotate(ZW, -M_PI / 2);
+    cells[5].pos(3) = .5;
+    cells[6].pos(3) = -.5;
+    cells[6].rotate(XW, -M_PI); // 180° rotation, any axis + W
     
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
     
@@ -145,6 +155,8 @@ int _main(int, char *argv[])
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
+    room.scale(4).pos(1) = 2;
+    
     while (!glfwWindowShouldClose(window))
     {
         glfwGetFramebufferSize(window, &display_w, &display_h);
@@ -155,8 +167,6 @@ int _main(int, char *argv[])
         timeBase = now;
         ImGui_ImplGlfwGL3_NewFrame();
         
-        obj.rotate(ZW, dt);
-        
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         program.use();
@@ -166,8 +176,7 @@ int _main(int, char *argv[])
         program.uniform1f("uLightRadius", lightRadius);
         program.uniform3f("uColor", 1, 1, 1);
         
-        // Render the scene
-        scene.render(camera);
+        room.render(camera);
         
         ImGui::Begin("Test parameters", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             if(ImGui::TreeNode("Lighting parameters"))

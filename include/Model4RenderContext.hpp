@@ -6,12 +6,12 @@
 #include "ShaderProgram.hpp"
 #include "Transform4.hpp"
 
-class Model4RenderContext : public RenderContext, public Transform4
+class Model4RenderContext : public RenderContext
 {
 public:
     Model4RenderContext(Geometry4 &geom, ShaderProgram &program);
+    virtual ~Model4RenderContext() { }
     virtual void render() override;
-    Vector4f color;
 protected:
     Geometry4 _geometry;
 };

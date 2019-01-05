@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <vector>
+#include <Windows.h>
 
 #include <Eigen/Eigen>
 
@@ -24,16 +25,15 @@ enum Planes4
 
 struct Transform4
 {
-    Transform4() : parent(nullptr) { mat = Matrix4f::Identity(); pos = Vector4f::Zero(); }
-    Transform4(const Matrix4f &m, const Vector4f &t) : mat(m), pos(t), parent(nullptr) { }
+    Transform4() { mat = Matrix4f::Identity(); pos = Vector4f::Zero(); }
+    Transform4(const Matrix4f &m, const Vector4f &t) : mat(m), pos(t) { }
     
     /**
      * Applies this transform to a vector.
      */
     Vector4f apply(const Vector4f &v) const
     {
-        Vector4f r = mat * v + pos;
-        return parent ? parent->apply(r) : r;
+        return mat * v + pos;
     }
     
     /**
@@ -42,11 +42,7 @@ struct Transform4
      */
     Transform4 chain(const Transform4 &b) const
     {
-        Transform4 t;
-        t.mat = b.mat * mat;
-        t.pos = b.mat * pos + b.pos;
-        t.parent = b.parent;
-        return t;
+        return Transform4(b.mat * mat, b.mat * pos + b.pos);
     }
     
     /**
@@ -114,10 +110,6 @@ struct Transform4
      * Translation component of the transform.
      */
     Vector4f pos;
-    /**
-     * Optional parent to this transform.
-     */
-    Transform4 *parent;
 };
 
 #endif
