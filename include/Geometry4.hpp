@@ -31,6 +31,23 @@ struct Geometry4
     ~Geometry4() { glDeleteBuffers(ARRAY_BUFFERS, _vbos); }
     
     /**
+     * Constructs a 4D geometry by promoting 3D vertices to 4D by adding an extra 0.
+     * This does not compute normal vectors automatically !
+     * @param   v3      array of 3D vertices
+     * @param   tetras  array of tetrahedron indices
+     */
+    static Geometry4 from3D(const vector<Vector3f> &v3, const vector<unsigned int> &tetras)
+    {
+        Geometry4 g;
+        
+        for(const Vector3f &v : v3)
+            g.vertices.push_back(Vector4f(v(0), v(1), v(2), 0));
+        g.cells.assign(tetras.begin(), tetras.end());
+        
+        return g;
+    }
+    
+    /**
      * Constructs 4D geometry by extruding 3D geometry along the W axis by a set
      * amount. This does not compute normal vectors automatically !
      * @param   v3      array of 3D vertices
