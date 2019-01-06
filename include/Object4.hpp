@@ -13,16 +13,9 @@
  */
 struct Object4 : public Transform4
 {
-    typedef std::shared_ptr<Object4> Object4Ptr;
+    static Object4 scene;
     
-    Object4() : Transform4() { }
-    Object4(const Object4 &obj) : Transform4(obj.mat, obj.pos)
-    {
-        _rc = obj._rc;
-        _children.assign(obj._children.begin(), obj._children.end());
-        color = obj.color;
-    }
-    Object4(Model4RenderContext &rc) : Transform4() { _rc = &rc; }
+    typedef std::shared_ptr<Object4> Object4Ptr;
     
     /**
      * Sets the rendering context for this object. Use `nullptr` to mark this
@@ -43,45 +36,44 @@ struct Object4 : public Transform4
     }
     
     /**
-     * Creates a new object as a children to this object.
+     * Creates a new object as a children to this object and returns a reference to it.
      */
     Object4 &addChild()
     {
         _children.push_back(Object4Ptr(new Object4));
-        return *this;
+        return *_children.back();
     }
     /**
-     * Adds an object as a children to this object.
+     * Adds an object as a children to this object and returns a reference to it.
      */
     Object4 &addChild(Object4 *c)
     {
         _children.push_back(Object4Ptr(c));
-        return *this;
+        return *_children.back();
     }
     /**
-     * Adds the copy of an object as a children to this object.
+     * Adds the copy of an object as a children to this object and returns a reference to it.
      */
     Object4 &addChild(const Object4 &obj)
     {
         _children.push_back(Object4Ptr(new Object4(obj)));
-        return *this;
+        return *_children.back();
     }
     /**
-     * Creates an object as a children to this object given a render context.
+     * Creates an object as a children to this object given a render context and returns a reference to it.
      */
     Object4 &addChild(Model4RenderContext &rc)
     {
         _children.push_back(Object4Ptr(new Object4(rc)));
-        return *this;
+        return *_children.back();
     }
     
     /**
      * Removes a child object from its index.
      */
-    Object4 &removeChild(unsigned int k)
+    void removeChild(unsigned int k)
     {
         _children.erase(_children.begin() + k);
-        return *this;
     }
     
     /**
@@ -117,6 +109,14 @@ struct Object4 : public Transform4
     Vector4f color;
     
 protected:
+    Object4() : Transform4() { }
+    Object4(const Object4 &obj) : Transform4(obj.mat, obj.pos)
+    {
+        _rc = obj._rc;
+        _children.assign(obj._children.begin(), obj._children.end());
+        color = obj.color;
+    }
+    Object4(Model4RenderContext &rc) : Transform4() { _rc = &rc; }
     void render(const Transform4 &vt)
     {
         Transform4 mv = chain(vt);
@@ -139,5 +139,7 @@ protected:
     Model4RenderContext *_rc = nullptr;
     std::vector<Object4Ptr> _children;
 };
+
+Object4 Object4::scene;
 
 #endif

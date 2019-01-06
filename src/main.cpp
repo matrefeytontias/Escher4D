@@ -116,17 +116,17 @@ int _main(int, char *argv[])
     Model4RenderContext holedRC(holedGeometry, program);
     
     // Build the scene
-    Object4 scene;
+    Object4 &scene = Object4::scene;
     // Build a single room
     // 8th cell has a hole in it
-    Object4 &room1 = scene.addChild()[0];
+    Object4 &room1 = scene.addChild();
     for(unsigned int k = 0; k < 7; k++)
     {
         room1.addChild(cubeRC);
         room1[k].color << 1, 1, 1, 1;
     }
     room1.addChild(holedRC);
-    room1[7].color << 1, 1, 1, 1;
+    room1[7].color << 1, 0, 0, 1;
     
     room1[7].pos(0) = .5;
     room1[7].rotate(XZ, M_PI / 2);
@@ -146,7 +146,7 @@ int _main(int, char *argv[])
     room1[6].rotate(XW, M_PI); // 180° rotation, any axis + W
     
     // Second room, adjacent to the first one by the open cell, which it lacks.
-    Object4 &room2 = scene.addChild(room1)[1];
+    Object4 &room2 = scene.addChild(room1);
     room2.removeChild(7);
     room2.rotate(XZ, M_PI);
     room2.pos(0) = 1;
