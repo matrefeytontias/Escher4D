@@ -50,9 +50,10 @@ struct Camera4 : private Transform4
         lookAt(dir, Vector4f(0, 1, 0, 0), Vector4f(0, 0, 0, 1));
         _prevMouseX = mouseX; _prevMouseY = mouseY;
         
-        // ZW rotation
-        _zw += xwSpeed * dt * (glfwGetKey(_window, GLFW_KEY_E) - glfwGetKey(_window, GLFW_KEY_Q));
-        rotate(ZW, _zw);
+        // XW + ZW rotation
+        _xwzw += xwSpeed * dt * (glfwGetKey(_window, GLFW_KEY_E) - glfwGetKey(_window, GLFW_KEY_Q));
+        rotate(XW, _xwzw);
+        rotate(ZW, _xwzw);
     }
     
     /**
@@ -70,9 +71,9 @@ struct Camera4 : private Transform4
      */
     float speed = 5.f;
     /**
-     * Rotation speed on the XW plane in rad/s.
+     * Rotation speed on the XW+ZW planes in rad/s.
      */
-    float xwSpeed = 1.;
+    float xwzwSpeed = 1.;
     
 private:
     friend int _main(int argc, char *argv[]);
@@ -80,7 +81,7 @@ private:
     GLFWwindow *_window;
     // Mouse position on the previous frame
     double _prevMouseX, _prevMouseY;
-    float _xz = 0, _yz = 0, _zw = 0;
+    float _xz = 0, _yz = 0, _xwzw = 0;
 };
 
 #endif

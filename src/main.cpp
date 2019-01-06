@@ -130,20 +130,21 @@ int _main(int, char *argv[])
     }
     
     cells[7].pos(0) = .5;
-    cells[7].rotate(XW, M_PI / 2);
+    cells[7].rotate(XZ, M_PI / 2);
+    cells[7].rotate(XW, -M_PI / 2);
     cells[0].pos(0) = -.5;
-    cells[0].rotate(XW, -M_PI / 2);
+    cells[0].rotate(XW, M_PI / 2);
     cells[1].pos(1) = .5;
-    cells[1].rotate(YW, M_PI / 2);
+    cells[1].rotate(YW, -M_PI / 2);
     cells[2].pos(1) = -.5;
-    cells[2].rotate(YW, -M_PI / 2);
+    cells[2].rotate(YW, M_PI / 2);
     cells[3].pos(2) = .5;
-    cells[3].rotate(ZW, M_PI / 2);
+    cells[3].rotate(ZW, -M_PI / 2);
     cells[4].pos(2) = -.5;
-    cells[4].rotate(ZW, -M_PI / 2);
+    cells[4].rotate(ZW, M_PI / 2);
     cells[5].pos(3) = .5;
     cells[6].pos(3) = -.5;
-    cells[6].rotate(XW, -M_PI); // 180° rotation, any axis + W
+    cells[6].rotate(XW, M_PI); // 180° rotation, any axis + W
     
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
     
@@ -176,6 +177,7 @@ int _main(int, char *argv[])
         program.uniform1f("uLightRadius", lightRadius);
         program.uniform3f("uColor", 1, 1, 1);
         
+        // room.rotate(XZ, dt);
         room.render(camera);
         
         ImGui::Begin("Test parameters", NULL, ImGuiWindowFlags_AlwaysAutoResize);
@@ -190,7 +192,7 @@ int _main(int, char *argv[])
                 ImGui::SliderFloat("Movement speed", &camera.speed, 1, 10);
                 ImGui::SliderFloat("Rotation divisor X", &camera.rotationDivisorX, 1, display_w);
                 ImGui::SliderFloat("Rotation divisor Y", &camera.rotationDivisorY, 1, display_h);
-                ImGui::SliderFloat("XW rotation speed", &camera.xwSpeed, 0.1, (float)M_PI * 2);
+                ImGui::SliderFloat("XW+ZW rotation speed", &camera.xwzwSpeed, 0.1, (float)M_PI * 2);
                 ImGui::TreePop();
             }
         ImGui::End();
@@ -198,7 +200,7 @@ int _main(int, char *argv[])
         ImGui::Begin("Positional info", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::Text("Camera position : %lf, %lf, %lf, %lf",
                 camera.pos(0), camera.pos(1), camera.pos(2), camera.pos(3));
-            ImGui::Text("Camera rotation : %lf, %lf, %lf", camera._xz, camera._yz, camera._zw);
+            ImGui::Text("Camera rotation : %lf, %lf, %lf", camera._xz, camera._yz, camera._xwzw);
         ImGui::End();
                 
         ImGui::Render();
