@@ -115,33 +115,41 @@ int _main(int, char *argv[])
     holedGeometry.uploadGPU();
     Model4RenderContext holedRC(holedGeometry, program);
     
+    // Build the scene
+    Object4 scene;
     // Build a single room
     // 8th cell has a hole in it
-    Object4 room;
+    Object4 &room1 = scene.addChild()[0];
     for(unsigned int k = 0; k < 7; k++)
     {
-        room.addChild(cubeRC);
-        room[k].color << 1, 1, 1, 1;
+        room1.addChild(cubeRC);
+        room1[k].color << 1, 1, 1, 1;
     }
-    room.addChild(holedRC);
-    room[7].color << 1, 1, 1, 1;
+    room1.addChild(holedRC);
+    room1[7].color << 1, 1, 1, 1;
     
-    room[7].pos(0) = .5;
-    room[7].rotate(XZ, M_PI / 2);
-    room[7].rotate(XW, -M_PI / 2);
-    room[0].pos(0) = -.5;
-    room[0].rotate(XW, M_PI / 2);
-    room[1].pos(1) = .5;
-    room[1].rotate(YW, -M_PI / 2);
-    room[2].pos(1) = -.5;
-    room[2].rotate(YW, M_PI / 2);
-    room[3].pos(2) = .5;
-    room[3].rotate(ZW, -M_PI / 2);
-    room[4].pos(2) = -.5;
-    room[4].rotate(ZW, M_PI / 2);
-    room[5].pos(3) = .5;
-    room[6].pos(3) = -.5;
-    room[6].rotate(XW, M_PI); // 180° rotation, any axis + W
+    room1[7].pos(0) = .5;
+    room1[7].rotate(XZ, M_PI / 2);
+    room1[7].rotate(XW, -M_PI / 2);
+    room1[0].pos(0) = -.5;
+    room1[0].rotate(XW, M_PI / 2);
+    room1[1].pos(1) = .5;
+    room1[1].rotate(YW, -M_PI / 2);
+    room1[2].pos(1) = -.5;
+    room1[2].rotate(YW, M_PI / 2);
+    room1[3].pos(2) = .5;
+    room1[3].rotate(ZW, -M_PI / 2);
+    room1[4].pos(2) = -.5;
+    room1[4].rotate(ZW, M_PI / 2);
+    room1[5].pos(3) = .5;
+    room1[6].pos(3) = -.5;
+    room1[6].rotate(XW, M_PI); // 180° rotation, any axis + W
+    
+    // Second room, adjacent to the first one by the open cell, which it lacks.
+    Object4 &room2 = scene.addChild(room1)[1];
+    room2.removeChild(7);
+    room2.rotate(XZ, M_PI);
+    room2.pos(0) = 1;
     
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
     
@@ -153,7 +161,8 @@ int _main(int, char *argv[])
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
-    room.scale(4).pos(1) = 2;
+    scene.scale(Vector4f(10, 6, 10, 10)).pos(1) = 3;
+    scene.rotate(XW, M_PI / 2);
     
     while (!glfwWindowShouldClose(window))
     {
@@ -172,10 +181,8 @@ int _main(int, char *argv[])
         program.uniformMatrix4fv("P", 1, &p.data()[0]);
         program.uniform1f("uLightIntensity", lightIntensity);
         program.uniform1f("uLightRadius", lightRadius);
-        program.uniform3f("uColor", 1, 1, 1);
         
-        // room.rotate(XZ, dt);
-        room.render(camera);
+        scene.render(camera);
         
         ImGui::Begin("Test parameters", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             if(ImGui::TreeNode("Lighting parameters"))

@@ -35,6 +35,14 @@ struct Object4 : public Transform4
     }
     
     /**
+     * Return references to children object.
+     */
+    Object4 &operator[](unsigned int k)
+    {
+        return *_children[k];
+    }
+    
+    /**
      * Creates a new object as a children to this object.
      */
     Object4 &addChild()
@@ -45,13 +53,21 @@ struct Object4 : public Transform4
     /**
      * Adds an object as a children to this object.
      */
-    Object4 &addChild(Object4 &c)
+    Object4 &addChild(Object4 *c)
     {
-        _children.push_back(Object4Ptr(&c));
+        _children.push_back(Object4Ptr(c));
         return *this;
     }
     /**
-     * Adds an object as a children to this object given a render context.
+     * Adds the copy of an object as a children to this object.
+     */
+    Object4 &addChild(const Object4 &obj)
+    {
+        _children.push_back(Object4Ptr(new Object4(obj)));
+        return *this;
+    }
+    /**
+     * Creates an object as a children to this object given a render context.
      */
     Object4 &addChild(Model4RenderContext &rc)
     {
@@ -60,11 +76,12 @@ struct Object4 : public Transform4
     }
     
     /**
-     * Return references to children object.
+     * Removes a child object from its index.
      */
-    Object4 &operator[](unsigned int k)
+    Object4 &removeChild(unsigned int k)
     {
-        return *_children[k];
+        _children.erase(_children.begin() + k);
+        return *this;
     }
     
     /**
@@ -74,6 +91,19 @@ struct Object4 : public Transform4
     Object4 shallowCopy()
     {
         return Object4(*this);
+    }
+    
+    /**
+     * Returns a deep copy of this object, that is, a new object where all the
+     * children are deep copies of the original's children.
+     */
+    Object4 deepCopy()
+    {
+        Object4 result(*this);
+        result._children.clear();
+        for(Object4Ptr &obj : _children)
+            result.addChild(obj->deepCopy());
+        return result;
     }
     
     /**
