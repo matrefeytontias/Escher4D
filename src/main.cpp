@@ -115,36 +115,33 @@ int _main(int, char *argv[])
     holedGeometry.uploadGPU();
     Model4RenderContext holedRC(holedGeometry, program);
     
-    // Build the room
+    // Build a single room
     // 8th cell has a hole in it
     Object4 room;
-    std::vector<Object4> cells;
     for(unsigned int k = 0; k < 7; k++)
-        cells.push_back(Object4(cubeRC));
-    cells.push_back(Object4(holedRC));
-    
-    for(unsigned int k = 0; k < 8; k++)
     {
-        room.addChild(&cells[k]);
-        cells[k].color << 1, 1, 1, 1;
+        room.addChild(cubeRC);
+        room[k].color << 1, 1, 1, 1;
     }
+    room.addChild(holedRC);
+    room[7].color << 1, 1, 1, 1;
     
-    cells[7].pos(0) = .5;
-    cells[7].rotate(XZ, M_PI / 2);
-    cells[7].rotate(XW, -M_PI / 2);
-    cells[0].pos(0) = -.5;
-    cells[0].rotate(XW, M_PI / 2);
-    cells[1].pos(1) = .5;
-    cells[1].rotate(YW, -M_PI / 2);
-    cells[2].pos(1) = -.5;
-    cells[2].rotate(YW, M_PI / 2);
-    cells[3].pos(2) = .5;
-    cells[3].rotate(ZW, -M_PI / 2);
-    cells[4].pos(2) = -.5;
-    cells[4].rotate(ZW, M_PI / 2);
-    cells[5].pos(3) = .5;
-    cells[6].pos(3) = -.5;
-    cells[6].rotate(XW, M_PI); // 180° rotation, any axis + W
+    room[7].pos(0) = .5;
+    room[7].rotate(XZ, M_PI / 2);
+    room[7].rotate(XW, -M_PI / 2);
+    room[0].pos(0) = -.5;
+    room[0].rotate(XW, M_PI / 2);
+    room[1].pos(1) = .5;
+    room[1].rotate(YW, -M_PI / 2);
+    room[2].pos(1) = -.5;
+    room[2].rotate(YW, M_PI / 2);
+    room[3].pos(2) = .5;
+    room[3].rotate(ZW, -M_PI / 2);
+    room[4].pos(2) = -.5;
+    room[4].rotate(ZW, M_PI / 2);
+    room[5].pos(3) = .5;
+    room[6].pos(3) = -.5;
+    room[6].rotate(XW, M_PI); // 180° rotation, any axis + W
     
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
     

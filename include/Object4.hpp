@@ -1,6 +1,8 @@
 #ifndef INC_OBJECT4
 #define INC_OBJECT4
 
+#include <memory>
+
 #include "Camera4.hpp"
 #include "Model4RenderContext.hpp"
 #include "Transform4.hpp"
@@ -11,6 +13,8 @@
  */
 struct Object4 : public Transform4
 {
+    typedef std::shared_ptr<Object4> Object4Ptr;
+    
     Object4() : Transform4() { }
     Object4(const Object4 &obj) : Transform4(obj.mat, obj.pos)
     {
@@ -29,13 +33,47 @@ struct Object4 : public Transform4
         _rc = rc;
         return *this;
     }
+    
+    /**
+     * Creates a new object as a children to this object.
+     */
+    Object4 &addChild()
+    {
+        _children.push_back(Object4Ptr(new Object4));
+        return *this;
+    }
     /**
      * Adds an object as a children to this object.
      */
-    Object4 &addChild(Object4 *c)
+    Object4 &addChild(Object4 &c)
     {
-        _children.push_back(c);
+        _children.push_back(Object4Ptr(&c));
         return *this;
+    }
+    /**
+     * Adds an object as a children to this object given a render context.
+     */
+    Object4 &addChild(Model4RenderContext &rc)
+    {
+        _children.push_back(Object4Ptr(new Object4(rc)));
+        return *this;
+    }
+    
+    /**
+     * Return references to children object.
+     */
+    Object4 &operator[](unsigned int k)
+    {
+        return *_children[k];
+    }
+    
+    /**
+     * Returns a shallow copy of this object, that is, a new object that has the
+     * same children as this one.
+     */
+    Object4 shallowCopy()
+    {
+        return Object4(*this);
     }
     
     /**
@@ -65,11 +103,11 @@ protected:
         }
         
         // Render children
-        for(Object4 *obj : _children)
+        for(Object4Ptr &obj : _children)
             obj->render(mv);
     }
     Model4RenderContext *_rc = nullptr;
-    std::vector<Object4*> _children;
+    std::vector<Object4Ptr> _children;
 };
 
 #endif

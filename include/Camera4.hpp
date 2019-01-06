@@ -51,7 +51,7 @@ struct Camera4 : private Transform4
         _prevMouseX = mouseX; _prevMouseY = mouseY;
         
         // XW + ZW rotation
-        _xwzw += xwSpeed * dt * (glfwGetKey(_window, GLFW_KEY_E) - glfwGetKey(_window, GLFW_KEY_Q));
+        _xwzw += xwzwSpeed * dt * (glfwGetKey(_window, GLFW_KEY_E) - glfwGetKey(_window, GLFW_KEY_Q));
         rotate(XW, _xwzw);
         rotate(ZW, _xwzw);
     }
