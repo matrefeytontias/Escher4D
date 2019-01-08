@@ -41,6 +41,11 @@ void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
     ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
 }
 
+// demos.cpp
+void complexDemo(Object4&);
+
+Object4 Object4::scene;
+
 int _main(int, char *argv[])
 {
     setwd(argv);
@@ -156,11 +161,7 @@ int _main(int, char *argv[])
     room1[4].pos(3) = -.5;
     room1[4].rotate(XW, M_PI); // 180° rotation, any axis + W
     
-    // Second room, adjacent to the first one by the +X cell, which it lacks.
-    Object4 &room2 = scene.addChild(room1);
-    room2.removeChild(5);
-    room2.scale(Vector4f(-1, 1, 1, 1));
-    room2.pos(0) = 1;
+    complexDemo(scene);
     
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
     
