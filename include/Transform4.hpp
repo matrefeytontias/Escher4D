@@ -75,8 +75,8 @@ struct Transform4
         int i = p >> 4, j = p & 0xf;
         float c = cos(angle), s = sin(angle);
         r(i, i) = r(j, j) = c;
-        r(i, j) = s;
-        r(j, i) = -s;
+        r(i, j) = -s;
+        r(j, i) = s;
         mat = r * mat;
         return *this;
     }
