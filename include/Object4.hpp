@@ -2,6 +2,7 @@
 #define INC_OBJECT4
 
 #include <memory>
+#include <cstdarg>
 
 #include "Camera4.hpp"
 #include "Model4RenderContext.hpp"
@@ -69,11 +70,21 @@ struct Object4 : public Transform4
     }
     
     /**
-     * Removes a child object from its index.
+     * Remove children using their index.
      */
     void removeChild(unsigned int k)
     {
         _children.erase(_children.begin() + k);
+    }
+    
+    /**
+     * Removes children using their index.
+     */
+    template <typename ... T>
+    void removeChild(unsigned int k, T ... args)
+    {
+        removeChild(k);
+        removeChild((args - 1)...);
     }
     
     /**
@@ -139,7 +150,5 @@ protected:
     Model4RenderContext *_rc = nullptr;
     std::vector<Object4Ptr> _children;
 };
-
-Object4 Object4::scene;
 
 #endif
