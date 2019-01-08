@@ -115,40 +115,51 @@ int _main(int, char *argv[])
     holedGeometry.uploadGPU();
     Model4RenderContext holedRC(holedGeometry, program);
     
-    // Build the scene
+    // Build the complex
     Object4 &scene = Object4::scene;
     // Build a single room
-    // 8th cell has a hole in it
+    // 3 cells have a hole in them, respectively in the directions +X, +Z and +W
     Object4 &room1 = scene.addChild();
-    for(unsigned int k = 0; k < 7; k++)
+    for(unsigned int k = 0; k < 5; k++)
     {
         room1.addChild(cubeRC);
         room1[k].color << 1, 1, 1, 1;
     }
     room1.addChild(holedRC);
-    room1[7].color << 1, 0, 0, 1;
+    room1[5].color << 1, 0, 0, 1;
+    room1.addChild(holedRC);
+    room1[6].color << 0, 1, 0, 1;
+    room1.addChild(holedRC);
+    room1[7].color << 0, 0, 1, 1;
     
-    room1[7].pos(0) = .5;
-    room1[7].rotate(XZ, M_PI / 2);
-    room1[7].rotate(XW, -M_PI / 2);
+    // +X
+    room1[5].pos(0) = .5;
+    room1[5].rotate(XW, -M_PI / 2);
+    // -X
     room1[0].pos(0) = -.5;
     room1[0].rotate(XW, M_PI / 2);
+    // +Y
     room1[1].pos(1) = .5;
     room1[1].rotate(YW, -M_PI / 2);
+    // -Y
     room1[2].pos(1) = -.5;
     room1[2].rotate(YW, M_PI / 2);
-    room1[3].pos(2) = .5;
-    room1[3].rotate(ZW, -M_PI / 2);
-    room1[4].pos(2) = -.5;
-    room1[4].rotate(ZW, M_PI / 2);
-    room1[5].pos(3) = .5;
-    room1[6].pos(3) = -.5;
-    room1[6].rotate(XW, M_PI); // 180° rotation, any axis + W
+    // +Z
+    room1[6].pos(2) = .5;
+    room1[6].rotate(ZW, -M_PI / 2);
+    // -Z
+    room1[3].pos(2) = -.5;
+    room1[3].rotate(ZW, M_PI / 2);
+    // +W
+    room1[7].pos(3) = .5;
+    // -W
+    room1[4].pos(3) = -.5;
+    room1[4].rotate(XW, M_PI); // 180° rotation, any axis + W
     
-    // Second room, adjacent to the first one by the open cell, which it lacks.
+    // Second room, adjacent to the first one by the +X cell, which it lacks.
     Object4 &room2 = scene.addChild(room1);
-    room2.removeChild(7);
-    room2.rotate(XZ, M_PI);
+    room2.removeChild(5);
+    room2.scale(Vector4f(-1, 1, 1, 1));
     room2.pos(0) = 1;
     
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
@@ -162,7 +173,6 @@ int _main(int, char *argv[])
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
     scene.scale(Vector4f(10, 6, 10, 10)).pos(1) = 3;
-    scene.rotate(XW, M_PI / 2);
     
     while (!glfwWindowShouldClose(window))
     {
