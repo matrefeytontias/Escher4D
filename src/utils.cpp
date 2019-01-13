@@ -87,10 +87,12 @@ void printShaderLog(GLuint shader)
 void _checkGLerror(const char *file, int line)
 {
     GLenum erro = glGetError();
+    std::cerr << file << ":" << line << " : 0x" << std::hex;
     do
     {
-        std::cerr << file << ":" << line << " : " << erro << std::endl;
+        std::cerr << erro << " ";
     } while ((erro = glGetError()));
+    std::cerr << std::dec << std::endl;
 }
 
 // Expects an identity matrix as input
