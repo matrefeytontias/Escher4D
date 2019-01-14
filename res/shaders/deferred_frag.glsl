@@ -13,5 +13,5 @@ void main()
     vec4 pos = texture(texPos, vTexCoord),
         normal = texture(texNormal, vTexCoord),
         color = texture(texColor, vTexCoord);
-    fragColor = color;
+    fragColor = abs(dot(normalize(normal), normalize(pos))) * color;
 }

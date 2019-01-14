@@ -20,5 +20,5 @@ void main()
     float sqd = dot(gPosition, gPosition);
     float falloff = clamp(1 - sqd * sqd / pow(uLightRadius, 4), 0, 1);
     falloff *= falloff / (1 + sqd);
-    fragColor = min(1, uLightIntensity * falloff) * abs(dot(normalize(gNormal), normalize(gPosition))) * uColor;
+    fragColor = min(1, uLightIntensity * falloff) * uColor;
 }
