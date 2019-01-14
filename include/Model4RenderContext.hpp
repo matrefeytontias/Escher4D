@@ -12,8 +12,8 @@ public:
     Model4RenderContext(Geometry4 &geom, ShaderProgram &program);
     virtual ~Model4RenderContext() { }
     virtual void render() override;
-protected:
-    Geometry4 _geometry;
+    
+    Geometry4 &geometry;
 };
 
 #endif

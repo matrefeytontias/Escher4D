@@ -207,6 +207,19 @@ int _main(int, char *argv[])
     
     complexDemo(scene);
     
+    // Print amount of tetrahedra for fun
+    {
+        int tetrahedra = 0;
+        scene.visit([&tetrahedra](const Object4 &obj)
+        {
+            const Model4RenderContext *rc = obj.getRenderContext();
+            if(rc)
+                tetrahedra += rc->geometry.cells.size() / 4;
+        });
+        trace("Scene has " << tetrahedra << " tetrahedra.");
+    }
+    
+    
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
     
     trace("Entering drawing loop");

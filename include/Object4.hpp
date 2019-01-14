@@ -1,6 +1,7 @@
 #ifndef INC_OBJECT4
 #define INC_OBJECT4
 
+#include <functional>
 #include <memory>
 #include <cstdarg>
 
@@ -26,6 +27,14 @@ struct Object4 : public Transform4
     {
         _rc = rc;
         return *this;
+    }
+    
+    /**
+     * Returns an immutable pointer to the render context of this object, if any.
+     */
+    const Model4RenderContext *getRenderContext() const
+    {
+        return _rc;
     }
     
     /**
@@ -70,7 +79,7 @@ struct Object4 : public Transform4
     }
     
     /**
-     * Remove children using their index.
+     * Removes children using their index.
      */
     void removeChild(unsigned int k)
     {
@@ -85,6 +94,16 @@ struct Object4 : public Transform4
     {
         removeChild(k);
         removeChild((args - 1)...);
+    }
+    
+    /**
+     * Executes a function on an object and all its children recursively.
+     */
+    void visit(const std::function<void(const Object4&)> &f)
+    {
+        f(*this);
+        for(Object4Ptr c : _children)
+            c->visit(f);
     }
     
     /**
