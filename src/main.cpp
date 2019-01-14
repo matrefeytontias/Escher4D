@@ -37,23 +37,37 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action, i
     }
 };
 
-void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
+static void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
     ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
 }
 
-void setupDeferred(unsigned int w, unsigned int h, GLuint gBuffer, GLuint tex[3], GLuint dBuffer)
+// Deferred rendering buffers and textures
+static GLuint gBuffer, dBuffer;
+Texture *texPos, *texNorm, *texColor;
+
+void setupDeferred(int w, int h)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
     
-    for(unsigned int i = 0; i < 3; ++i)
-    {
-        glBindTexture(GL_TEXTURE_2D, tex[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, tex[i], 0);
-    }
+    glBindTexture(GL_TEXTURE_2D, texPos->id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texPos->id, 0);
+    
+    glBindTexture(GL_TEXTURE_2D, texNorm->id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8_SNORM, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texNorm->id, 0);
+    
+    glBindTexture(GL_TEXTURE_2D, texColor->id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, w, h, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texColor->id, 0);
+    
     const static unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
         GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
@@ -63,6 +77,11 @@ void setupDeferred(unsigned int w, unsigned int h, GLuint gBuffer, GLuint tex[3]
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, dBuffer);
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+static void framebufferSizeCallback(GLFWwindow*, int width, int height)
+{
+    setupDeferred(width, height);
 }
 
 // demos.cpp
@@ -97,6 +116,7 @@ int _main(int, char *argv[])
     ImGui_ImplGlfwGL3_Init(window, true);
     glfwSetKeyCallback(window, keyCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     
     // Setup style
     ImGui::StyleColorsDark();
@@ -203,16 +223,14 @@ int _main(int, char *argv[])
     ShaderProgram quadProgram;
     quadProgram.attach(GL_VERTEX_SHADER, "shaders/deferred_vert.glsl");
     quadProgram.attach(GL_FRAGMENT_SHADER, "shaders/deferred_frag.glsl");
-    Texture &texPos = quadProgram.getTexture("texPos"),
-        &texNormal = quadProgram.getTexture("texNormal"),
-        &texColor = quadProgram.getTexture("texColor");
+    texPos = &quadProgram.getTexture("texPos");
+    texNorm = &quadProgram.getTexture("texNorm");
+    texColor = &quadProgram.getTexture("texColor");
     
-    GLuint gBuffer, dBuffer, tex[3];
     glGenFramebuffers(1, &gBuffer);
     glGenRenderbuffers(1, &dBuffer);
-    tex[0] = texPos.id; tex[1] = texNormal.id; tex[2] = texColor.id;
     
-    setupDeferred(display_w, display_h, gBuffer, tex, dBuffer);
+    setupDeferred(display_w, display_h);
     
     FSQuadRenderContext quadRC(quadProgram);
     
@@ -220,17 +238,15 @@ int _main(int, char *argv[])
     
     while (!glfwWindowShouldClose(window))
     {
-        // glfwGetFramebufferSize(window, &display_w, &display_h);
-        // glViewport(0, 0, display_w, display_h);
-        // setAspectRatio(p, (float)display_w / display_h);
-        //
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        setAspectRatio(p, (float)display_w / display_h);
+        
         glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
         glViewport(0, 0, display_w, display_h);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         float now = glfwGetTime(), dt = now - timeBase;
         timeBase = now;
-        ImGui_ImplGlfwGL3_NewFrame();
         
         program.use();
         
@@ -246,6 +262,8 @@ int _main(int, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         quadProgram.use();
         quadRC.render();
+        
+        ImGui_ImplGlfwGL3_NewFrame();
         
         ImGui::Begin("Test parameters", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             if(ImGui::TreeNode("Lighting parameters"))
@@ -264,7 +282,8 @@ int _main(int, char *argv[])
             }
         ImGui::End();
         
-        ImGui::Begin("Positional info", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Begin("Debug info", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+            ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
             ImGui::Text("Camera position : %lf, %lf, %lf, %lf",
                 camera.pos(0), camera.pos(1), camera.pos(2), camera.pos(3));
             ImGui::Text("Camera rotation : %lf, %lf, %lf", camera._xz, camera._yz, camera._xwzw);
