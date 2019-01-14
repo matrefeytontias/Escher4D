@@ -5,6 +5,7 @@
 #include "utils.hpp"
 
 std::map<GLuint, int> Texture::_pool;
+GLuint ShaderProgram::_currentProgram = 0;
 
 ShaderProgram::ShaderProgram()
 {
@@ -54,19 +55,22 @@ void ShaderProgram::attach(GLenum type, const char *path)
 void ShaderProgram::use()
 {
     if(_dirty)
-    {
         glLinkProgram(_program);
-        _dirty = false;
-    }
     glBindVertexArray(_vao);
-    glUseProgram(_program);
-    int i = 0;
-    for(auto tex : _textures)
+    if(_currentProgram != _program)
+        glUseProgram(_program);
+    if(_dirty || _currentProgram != _program)
     {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(tex.second.target, tex.second.id);
-        glUniform1i(ensureUniform(tex.first), i++);
+        int i = 0;
+        for(auto tex : _textures)
+        {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(tex.second.target, tex.second.id);
+            glUniform1i(ensureUniform(tex.first), i++);
+        }
     }
+    _dirty = false;
+    _currentProgram = _program;
 }
 
 void ShaderProgram::uniform1f(const string &name, float v)
@@ -107,11 +111,14 @@ void ShaderProgram::vertexAttribPointer(const string &name, GLuint size, GLenum 
 
 Texture &ShaderProgram::getTexture(const string &name)
 {
-    return _textures.emplace(name, Texture()).first->second;
+    auto it = _textures.emplace(name, Texture());
+    _dirty |= it.second;
+    return it.first->second;
 }
 
 Texture &ShaderProgram::registerTexture(const string &name, const Texture &tex)
 {
+    _dirty = true;
     return _textures[name] = tex;
 }
 

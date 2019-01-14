@@ -88,6 +88,7 @@ private:
     map<string, GLint> _uniforms;
     map<string, GLint> _attributes;
     map<string, Texture> _textures;
+    static GLuint _currentProgram;
 };
 
 #endif
