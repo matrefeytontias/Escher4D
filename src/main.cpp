@@ -15,6 +15,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Camera4.hpp"
+#include "FSQuadRenderContext.hpp"
 #include "OFFLoader.hpp"
 #include "Object4.hpp"
 #include "ShaderProgram.hpp"
@@ -39,6 +40,29 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action, i
 void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
     ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+}
+
+void setupDeferred(unsigned int w, unsigned int h, GLuint gBuffer, GLuint tex[3], GLuint dBuffer)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    
+    for(unsigned int i = 0; i < 3; ++i)
+    {
+        glBindTexture(GL_TEXTURE_2D, tex[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, tex[i], 0);
+    }
+    const static unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
+        GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, attachments);
+    
+    glBindRenderbuffer(GL_RENDERBUFFER, dBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, dBuffer);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 // demos.cpp
@@ -175,17 +199,38 @@ int _main(int, char *argv[])
     
     scene.scale(Vector4f(10, 6, 10, 10)).pos(1) = 3;
     
+    // Setup deferred shading
+    ShaderProgram quadProgram;
+    quadProgram.attach(GL_VERTEX_SHADER, "shaders/deferred_vert.glsl");
+    quadProgram.attach(GL_FRAGMENT_SHADER, "shaders/deferred_frag.glsl");
+    Texture &texPos = quadProgram.getTexture("texPos"),
+        &texNormal = quadProgram.getTexture("texNormal"),
+        &texColor = quadProgram.getTexture("texColor");
+    
+    GLuint gBuffer, dBuffer, tex[3];
+    glGenFramebuffers(1, &gBuffer);
+    glGenRenderbuffers(1, &dBuffer);
+    tex[0] = texPos.id; tex[1] = texNormal.id; tex[2] = texColor.id;
+    
+    setupDeferred(display_w, display_h, gBuffer, tex, dBuffer);
+    
+    FSQuadRenderContext quadRC(quadProgram);
+    
+    glClearColor(0, 0, 0, 1);
+    
     while (!glfwWindowShouldClose(window))
     {
-        glfwGetFramebufferSize(window, &display_w, &display_h);
+        // glfwGetFramebufferSize(window, &display_w, &display_h);
+        // glViewport(0, 0, display_w, display_h);
+        // setAspectRatio(p, (float)display_w / display_h);
+        //
+        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
         glViewport(0, 0, display_w, display_h);
-        setAspectRatio(p, (float)display_w / display_h);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         float now = glfwGetTime(), dt = now - timeBase;
         timeBase = now;
         ImGui_ImplGlfwGL3_NewFrame();
-        
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         program.use();
         
@@ -194,6 +239,13 @@ int _main(int, char *argv[])
         program.uniform1f("uLightRadius", lightRadius);
         
         scene.render(camera);
+        
+        // Deferred rendering
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, display_w, display_h);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        quadProgram.use();
+        quadRC.render();
         
         ImGui::Begin("Test parameters", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             if(ImGui::TreeNode("Lighting parameters"))
