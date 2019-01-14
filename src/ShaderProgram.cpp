@@ -107,12 +107,7 @@ void ShaderProgram::vertexAttribPointer(const string &name, GLuint size, GLenum 
 
 Texture &ShaderProgram::getTexture(const string &name)
 {
-    if(_textures.find(name) == _textures.end())
-    {
-        Texture tex;
-        _textures[name] = tex;
-    }
-    return _textures[name];
+    return _textures.emplace(name, Texture()).first->second;
 }
 
 Texture &ShaderProgram::registerTexture(const string &name, const Texture &tex)

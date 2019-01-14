@@ -7,6 +7,8 @@
 
 #include <glad/glad.h>
 
+#include "utils.hpp"
+
 using namespace std;
 
 struct Texture
@@ -17,25 +19,45 @@ struct Texture
     Texture()
     {
         glGenTextures(1, &id);
-        _pool[id] = 1;
+        registerTex(*this);
     }
     
-    Texture(const Texture& t)
+    Texture(const Texture &t)
     {
         id = t.id;
         target = t.target;
-        _pool[id]++;
+        registerTex(*this);
+    }
+    
+    Texture &operator=(const Texture &t)
+    {
+        unregisterTex(*this);
+        id = t.id;
+        target = t.target;
+        registerTex(*this);
+        return *this;
     }
     
     ~Texture()
     {
-        if(!--_pool[id])
-        {
-            glDeleteTextures(1, &id);
-            _pool.erase(id);
-        }
+        unregisterTex(*this);
     }
 private:
+    static void registerTex(const Texture &t)
+    {
+        if(_pool.find(t.id) == _pool.end())
+            _pool[t.id] = 1;
+        else
+            ++_pool[t.id];
+    }
+    static void unregisterTex(const Texture &t)
+    {
+        if(!--_pool[t.id])
+        {
+            glDeleteTextures(1, &t.id);
+            _pool.erase(t.id);
+        }
+    }
     static map<GLuint, int> _pool;
 };
 
