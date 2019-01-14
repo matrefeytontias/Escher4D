@@ -106,7 +106,7 @@ int _main(int, char *argv[])
     GLFWwindow *window = glfwCreateWindow(1280, 720, "GLFW Window", NULL, NULL);
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-    glfwSwapInterval(1); // Enable vsync
+    glfwSwapInterval(0); // no v-sync, live on the edge
     
     // Setup ImGui binding
     ImGui::CreateContext();
@@ -208,16 +208,13 @@ int _main(int, char *argv[])
     complexDemo(scene);
     
     // Print amount of tetrahedra for fun
+    int tetrahedra = 0;
+    scene.visit([&tetrahedra](const Object4 &obj)
     {
-        int tetrahedra = 0;
-        scene.visit([&tetrahedra](const Object4 &obj)
-        {
-            const Model4RenderContext *rc = obj.getRenderContext();
-            if(rc)
-                tetrahedra += rc->geometry.cells.size() / 4;
-        });
-        trace("Scene has " << tetrahedra << " tetrahedra.");
-    }
+        const Model4RenderContext *rc = obj.getRenderContext();
+        if(rc)
+            tetrahedra += rc->geometry.cells.size() / 4;
+    });
     
     
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
@@ -296,7 +293,7 @@ int _main(int, char *argv[])
         ImGui::End();
         
         ImGui::Begin("Debug info", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-            ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+            ImGui::Text("Rendering %d tetrahedra at %.1f FPS", tetrahedra, ImGui::GetIO().Framerate);
             ImGui::Text("Camera position : %lf, %lf, %lf, %lf",
                 camera.pos(0), camera.pos(1), camera.pos(2), camera.pos(3));
             ImGui::Text("Camera rotation : %lf, %lf, %lf", camera._xz, camera._yz, camera._xwzw);
