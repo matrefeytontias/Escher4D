@@ -85,17 +85,17 @@ void main()
     if(s4 == 0.)
         v1v4 = 1.;
     
-    if(s1 != s2 && s1 + s2 == 0.)
+    if(s1 * s2 == -1.)
         v1v2 = lineSpaceIntersect(v1, v2);
-    if(s1 != s3 && s1 + s3 == 0.)
+    if(s1 * s3 == -1.)
         v1v3 = lineSpaceIntersect(v1, v3);
-    if(s1 != s4 && s1 + s4 == 0.)
+    if(s1 * s4 == -1.)
         v1v4 = lineSpaceIntersect(v1, v4);
-    if(s2 != s3 && s2 + s3 == 0.)
+    if(s2 * s3 == -1.)
         v2v3 = lineSpaceIntersect(v2, v3);
-    if(s2 != s4 && s2 + s4 == 0.)
+    if(s2 * s4 == -1.)
         v2v4 = lineSpaceIntersect(v2, v4);
-    if(s3 != s4 && s3 + s4 == 0.)
+    if(s3 * s4 == -1.)
         v3v4 = lineSpaceIntersect(v3, v4);
 
     
