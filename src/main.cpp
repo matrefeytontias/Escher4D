@@ -63,7 +63,7 @@ void setupDeferred(int w, int h)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texNorm->id, 0);
     
     glBindTexture(GL_TEXTURE_2D, texColor->id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, w, h, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texColor->id, 0);
@@ -89,6 +89,10 @@ void complexDemo(Object4&);
 
 Object4 Object4::scene;
 
+extern "C" {
+    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+}
+
 int _main(int, char *argv[])
 {
     setwd(argv);
@@ -100,7 +104,7 @@ int _main(int, char *argv[])
         trace("Couldn't initialize GLFW");
         return 1;
     }
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     GLFWwindow *window = glfwCreateWindow(1280, 720, "GLFW Window", NULL, NULL);
@@ -244,6 +248,10 @@ int _main(int, char *argv[])
     
     FSQuadRenderContext quadRC(quadProgram);
     
+    // Compute kernel setup
+    ShaderProgram computeProgram;
+    computeProgram.attach(GL_COMPUTE_SHADER, "shaders/test_compute.glsl");
+    
     glClearColor(0, 0, 0, 1);
     
     while (!glfwWindowShouldClose(window))
@@ -265,6 +273,11 @@ int _main(int, char *argv[])
         program.uniform1f("uLightRadius", lightRadius);
         
         scene.render(camera);
+        
+        // GPGPU fun
+        computeProgram.use();
+        glBindImageTexture(0, texColor->id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
+        glDispatchCompute(display_w / 8, display_h / 8, 1);
         
         // Deferred rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
