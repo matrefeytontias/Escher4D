@@ -1,4 +1,4 @@
-#version 150
+#version 430
 
 uniform mat4 MV;
 uniform mat4 tinvMV;

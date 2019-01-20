@@ -1,4 +1,4 @@
-#version 150
+#version 430
 
 // Intersects 4D geometry with the w = 0 hyperplane and produces triangles
 // entirely contained in said hyperplane. The result is 3D geometry with information
