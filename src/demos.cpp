@@ -1,8 +1,8 @@
 #include "Object4.hpp"
 
 /**
- * Builds a 4D complex which is basically a hypercube sliced in each of the 4
- * possible directions, ie 16 hypercubes.
+ * Builds a 4D complex which is basically a hypercube sliced in the X, Z and W
+ * directions, ie 8 hypercubes.
  */
 void complexDemo(Object4 &scene)
 {
