@@ -99,11 +99,22 @@ struct Object4 : public Transform4
     /**
      * Executes a function on an object and all its children recursively.
      */
-    void visit(const std::function<void(const Object4&)> &f)
+    void visit(const std::function<void(const Object4&)> &f) const
     {
         f(*this);
-        for(Object4Ptr c : _children)
+        for(const Object4Ptr &c : _children)
             c->visit(f);
+    }
+    /**
+     * Executes a function on an object and all its children recursively while
+     * propagating an argument.
+     */
+    template <typename T>
+    void visit(const std::function<T(const Object4&, T&)> &f, T &init) const
+    {
+        T ret = f(*this, init);
+        for(const Object4Ptr &c : _children)
+            c->visit(f, ret);
     }
     
     /**
@@ -137,6 +148,8 @@ struct Object4 : public Transform4
     }
     
     Vector4f color;
+    
+    bool castShadows = true;
     
 protected:
     Object4() : Transform4() { }
