@@ -105,7 +105,7 @@ int _main(int, char *argv[])
         return 1;
     }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     GLFWwindow *window = glfwCreateWindow(1280, 720, "GLFW Window", NULL, NULL);
     glfwMakeContextCurrent(window);
@@ -249,8 +249,61 @@ int _main(int, char *argv[])
     FSQuadRenderContext quadRC(quadProgram);
     
     // Compute kernel setup
+    std::vector<int> cellsCompBuffer; // ivec4
+    std::vector<int> objIndexCompBuffer; // int
+    std::vector<Vector4f> vertexCompBuffer; // vec4
+    std::vector<Matrix4f> MCompBuffer; // mat4
+    std::vector<Vector4f> MtCompBuffer; // vec4
+    GLuint texShadow;
+    glGenTextures(1, &texShadow);
+    glBindTexture(GL_TEXTURE_2D, texShadow);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, display_w / 32 + 1, display_h, 0,
+        GL_RED_INTEGER, GL_UNSIGNED_INT, NULL);
+    // Clear that texture with black
+    {
+        unsigned int bleh = 0;
+        glClearTexImage(texShadow, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &bleh);
+    }
+    int objectIndex = 0;
+    scene.visit([&](const Object4 &obj)
+    {
+        if(obj.castShadows)
+        {
+            const Model4RenderContext *rc = obj.getRenderContext();
+            if(rc && rc->geometry.isIndexed())
+            {
+                const Geometry4 &geom = rc->geometry;
+                const int vertexCount = vertexCompBuffer.size();
+                for(unsigned int k = 0; k < geom.cells.size(); k++)
+                {
+                    cellsCompBuffer.push_back(geom.cells[k] + vertexCount);
+                    if(!(k % 4))
+                        objIndexCompBuffer.push_back(objectIndex);
+                }
+                vertexCompBuffer.insert(vertexCompBuffer.end(), geom.vertices.begin(), geom.vertices.end());
+            }
+        }
+    });
+    // 0 : cells, 1 : object index, 2 : vertices, 3 : M matrices, 4 : translation part of M matrices
+    GLuint compBufferObjs[5];
+    glGenBuffers(5, compBufferObjs);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[0]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, cellsCompBuffer.size() * sizeof(int), &cellsCompBuffer[0], GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[1]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, objIndexCompBuffer.size() * sizeof(int), &objIndexCompBuffer[0], GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[2]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, vertexCompBuffer.size() * sizeof(Vector4f), &vertexCompBuffer[0](0), GL_STATIC_DRAW);
+    for(unsigned int k = 0; k < 5; k++)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, k, compBufferObjs[k]);
+    
     ShaderProgram computeProgram;
     computeProgram.attach(GL_COMPUTE_SHADER, "shaders/test_compute.glsl");
+    
+    int mwgcx, mwgcy, mwgcz;
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &mwgcx);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &mwgcy);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &mwgcz);
+    trace("GPU allows for a maximum of (" << mwgcx << ", " << mwgcy << ", " << mwgcz << ") work groups");
     
     glClearColor(0, 0, 0, 1);
     
@@ -259,6 +312,7 @@ int _main(int, char *argv[])
         glfwGetFramebufferSize(window, &display_w, &display_h);
         setAspectRatio(p, (float)display_w / display_h);
         
+        /// Render scene on framebuffer for deferred shading
         glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
         glViewport(0, 0, display_w, display_h);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -269,21 +323,40 @@ int _main(int, char *argv[])
         program.use();
         
         program.uniformMatrix4fv("P", 1, &p.data()[0]);
-        program.uniform1f("uLightIntensity", lightIntensity);
-        program.uniform1f("uLightRadius", lightRadius);
         
         scene.render(camera);
         
-        // GPGPU fun
-        computeProgram.use();
-        glBindImageTexture(0, texColor->id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
-        glDispatchCompute(display_w / 8, display_h / 8, 1);
+        /// GPGPU fun
+        // Compute MV matrices for all meshes
+        MCompBuffer.clear();
+        MtCompBuffer.clear();
+        Transform4 vt = camera.computeViewTransform();
+        scene.visit<Transform4>([&](const Object4 &obj, Transform4 &vt)
+        {
+            Transform4 mv = obj.chain(vt);
+            MCompBuffer.push_back(mv.mat);
+            MtCompBuffer.push_back(mv.pos);
+            return mv;
+        }, vt);
         
-        // Deferred rendering
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[3]);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, MCompBuffer.size() * sizeof(Matrix4f), MCompBuffer[0].data(), GL_STREAM_DRAW);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[4]);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, MtCompBuffer.size() * sizeof(Vector4f), &MtCompBuffer[0](0), GL_STREAM_DRAW);
+        computeProgram.use();
+        glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+        glBindImageTexture(1, texShadow, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
+        computeProgram.uniform4f("uLightPos", 0, 0, 0, 0);
+        // glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
+        
+        /// Deferred rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, display_w, display_h);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         quadProgram.use();
+        quadProgram.uniform1f("uLightIntensity", lightIntensity);
+        quadProgram.uniform1f("uLightRadius", lightRadius);
+        quadProgram.uniform4f("uLightPos", 0, 0, 0, 0);
         quadRC.render();
         
         ImGui_ImplGlfwGL3_NewFrame();
@@ -319,6 +392,9 @@ int _main(int, char *argv[])
         if(!freezeCamera)
             camera.update(dt);
     }
+    
+    glDeleteBuffers(5, compBufferObjs);
+    glDeleteTextures(1, &texShadow);
     
     trace("Exiting drawing loop");
     // Cleanup
