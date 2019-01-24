@@ -72,6 +72,7 @@ public:
     void uniform2f(const string &name, float v1, float v2);
     void uniform3f(const string &name, float v1, float v2, float v3);
     void uniform4f(const string &name, float v1, float v2, float v3, float v4);
+    void uniform2i(const string &name, int i1, int i2);
     void uniformMatrix4fv(const string &name, GLuint count, const GLfloat *v);
     void uniformMatrix3fv(const string &name, GLuint count, const GLfloat *v);
     void vertexAttribPointer(const string &name, GLuint size, GLenum type, GLsizei stride, const GLuint offset);

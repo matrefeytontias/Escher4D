@@ -4,7 +4,9 @@
 #include "ShaderProgram.hpp"
 #include "utils.hpp"
 
-std::map<GLuint, int> Texture::_pool;
+using namespace std;
+
+map<GLuint, int> Texture::_pool;
 GLuint ShaderProgram::_currentProgram = 0;
 
 ShaderProgram::ShaderProgram()
@@ -91,6 +93,11 @@ void ShaderProgram::uniform3f(const string &name, float v1, float v2, float v3)
 void ShaderProgram::uniform4f(const string &name, float v1, float v2, float v3, float v4)
 {
     glUniform4f(ensureUniform(name), v1, v2, v3, v4);
+}
+
+void ShaderProgram::uniform2i(const string &name, int i1, int i2)
+{
+    glUniform2i(ensureUniform(name), i1, i2);
 }
 
 void ShaderProgram::uniformMatrix4fv(const string &name, GLuint count, const GLfloat *v)
