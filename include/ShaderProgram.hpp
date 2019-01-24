@@ -9,8 +9,6 @@
 
 #include "utils.hpp"
 
-using namespace std;
-
 struct Texture
 {
     GLuint id = 0;
@@ -58,11 +56,12 @@ private:
             _pool.erase(t.id);
         }
     }
-    static map<GLuint, int> _pool;
+    static std::map<GLuint, int> _pool;
 };
 
 class ShaderProgram
 {
+    typedef std::string string;
 public:
     ShaderProgram();
     ~ShaderProgram();
@@ -84,10 +83,10 @@ public:
 private:
     bool _dirty;
     GLuint _vao, _program;
-    vector<GLenum> _shaders;
-    map<string, GLint> _uniforms;
-    map<string, GLint> _attributes;
-    map<string, Texture> _textures;
+    std::vector<GLenum> _shaders;
+    std::map<string, GLint> _uniforms;
+    std::map<string, GLint> _attributes;
+    std::map<string, Texture> _textures;
     static GLuint _currentProgram;
 };
 

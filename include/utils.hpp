@@ -53,6 +53,8 @@ void _checkGLerror(const char *file, int line);
  */
 #define fatal(s) do { std::stringstream ss; ss << __FILE__ << ":" << __LINE__ << " : " << s << std::endl; throw std::runtime_error(ss.str()); } while(0)
 
+
+#ifndef min
 /**
  * Minimum of two values of the same comparable type.
  */
@@ -60,7 +62,9 @@ template <typename T> inline T min(T a, T b)
 {
     return a < b ? a : b;
 }
+#endif
 
+#ifndef max
 /**
  * Maximum of two values of the same comparable type.
  */
@@ -68,6 +72,7 @@ template <typename T> inline T max(T a, T b)
 {
     return a > b ? a : b;
 }
+#endif
 
 /**
  * Keep a value in between two other values. All must be of the same comparable type.

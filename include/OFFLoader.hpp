@@ -11,22 +11,23 @@
 #include "utils.hpp"
 
 using namespace Eigen;
-using namespace std;
 
 namespace OFFLoader
 {
+    typedef std::string string;
+    
 /**
  * Loads a 3D model from a base file name. Fills arrays with "basename.off",
  * "basename.face" and "basename.ele" for vertices, triangles and tetrahedra
  * respectively.
  * @return  whether or not the operation succeeded
  */
-bool loadModel(const std::string &baseName, std::vector<Vector3f> &v,
+bool loadModel(const string &baseName, std::vector<Vector3f> &v,
     std::vector<unsigned int> &tris, std::vector<unsigned int> &tetras)
 {
     try
     {
-        vector<string> offFile = split(getFileContents(baseName + ".off"), "\r\n"),
+        std::vector<string> offFile = split(getFileContents(baseName + ".off"), "\r\n"),
             faceFile = split(getFileContents(baseName + ".face"), "\r\n"),
             tetraFile = split(getFileContents(baseName + ".ele"), "\r\n");
         
@@ -37,7 +38,7 @@ bool loadModel(const std::string &baseName, std::vector<Vector3f> &v,
         v.resize(nb, Vector3f::Zero());
         for(unsigned int i = 0; i < nb; i++)
         {
-            vector<string> vertex = split(offFile[i + 2], " \t");
+            std::vector<string> vertex = split(offFile[i + 2], " \t");
             v[i](0) = stof(vertex[0]);
             v[i](1) = stof(vertex[1]);
             v[i](2) = stof(vertex[2]);
@@ -47,7 +48,7 @@ bool loadModel(const std::string &baseName, std::vector<Vector3f> &v,
         tris.resize(nb * 3);
         for(unsigned int i = 0; i < nb; i++)
         {
-            vector<string> tri = split(faceFile[i + 1], " \t");
+            std::vector<string> tri = split(faceFile[i + 1], " \t");
             tris[i * 3] = stoi(tri[1]);
             tris[i * 3 + 1] = stoi(tri[2]);
             tris[i * 3 + 2] = stoi(tri[3]);
@@ -57,7 +58,7 @@ bool loadModel(const std::string &baseName, std::vector<Vector3f> &v,
         tetras.resize(nb * 4);
         for(unsigned int i = 0; i < nb; i++)
         {
-            vector<string> tetra = split(tetraFile[i + 1], " \t");
+            std::vector<string> tetra = split(tetraFile[i + 1], " \t");
             tetras[i * 4] = stoi(tetra[1]);
             tetras[i * 4 + 1] = stoi(tetra[2]);
             tetras[i * 4 + 2] = stoi(tetra[3]);

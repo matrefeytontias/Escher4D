@@ -13,7 +13,6 @@
 #include "utils.hpp"
 
 using namespace Eigen;
-using namespace std;
 
 enum
 {
@@ -36,7 +35,7 @@ struct Geometry4
      * @param   v3      array of 3D vertices
      * @param   tetras  array of tetrahedron indices
      */
-    static Geometry4 from3D(const vector<Vector3f> &v3, const vector<unsigned int> &tetras)
+    static Geometry4 from3D(const std::vector<Vector3f> &v3, const std::vector<unsigned int> &tetras)
     {
         Geometry4 g;
         
@@ -55,8 +54,8 @@ struct Geometry4
      * @param   tetras  array of tetrahedron indices
      * @param   duth    amount of extrusion along the W axis
      */
-    static Geometry4 from3D(const vector<Vector3f> &v3, const vector<unsigned int> &tris,
-        const vector<unsigned int> &tetras, float duth)
+    static Geometry4 from3D(const std::vector<Vector3f> &v3, const std::vector<unsigned int> &tris,
+        const std::vector<unsigned int> &tetras, float duth)
     {
         Geometry4 g;
         int base = v3.size();
@@ -112,7 +111,7 @@ struct Geometry4
                 float paraVolume = cellN.norm();
                 auto sdist = [&](int i, int j) { return (vertices[cell[i % 4]] - vertices[cell[j % 4]]).squaredNorm(); };
                 
-                // Skeleton checking for normal vector orientation
+                // Skeleton checking for normal std::vector orientation
                 Vector4f &checker = zero;
                 if(skeleton.size() > 0)
                     checker = *MathUtil::nearestPoint(vertices[cell[0]], skeleton);
@@ -143,7 +142,7 @@ struct Geometry4
                 Vector4f n = MathUtil::cross4(vertices[i + 1] - vertices[i], vertices[i + 2] - vertices[i],
                     vertices[i + 3] - vertices[i]);
                 
-                // Skeleton checking for normal vector orientation
+                // Skeleton checking for normal std::vector orientation
                 Vector4f &checker = zero;
                 if(skeleton.size() > 0)
                     checker = *MathUtil::nearestPoint(vertices[i], skeleton);
@@ -170,7 +169,7 @@ struct Geometry4
     Vector4f barycenter() const
     {
         Vector4f z = Vector4f::Zero();
-        return accumulate(vertices.begin(), vertices.end(), z) / vertices.size();
+        return std::accumulate(vertices.begin(), vertices.end(), z) / vertices.size();
     }
     
     /**
@@ -192,7 +191,7 @@ struct Geometry4
      */
     void unindex()
     {
-        vector<Vector4f> newv;
+        std::vector<Vector4f> newv;
         for(unsigned int i : cells)
             newv.push_back(vertices[i]);
         vertices.assign(newv.begin(), newv.end());
@@ -250,19 +249,19 @@ struct Geometry4
     /**
      * Vertices of the geomtry.
      */
-    vector<Vector4f> vertices;
+    std::vector<Vector4f> vertices;
     /**
-     * Optional skeleton used for normal vector orientation.
+     * Optional skeleton used for normal std::vector orientation.
      */
-    vector<Vector4f> skeleton;
+    std::vector<Vector4f> skeleton;
     /**
      * Cell indices. Cells are tetrahedra living in 4-space.
      */
-    vector<unsigned int> cells;
+    std::vector<unsigned int> cells;
     /**
      * Normal vectors at every vertex. This is not automatically recomputed !
      */
-    vector<Vector4f> normals;
+    std::vector<Vector4f> normals;
 private:
     GLuint _vbos[ARRAY_BUFFERS];
 };
