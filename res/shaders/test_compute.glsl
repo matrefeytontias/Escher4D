@@ -31,9 +31,12 @@ layout(std430, binding = 4) buffer MVtBuffer
 {
     vec4 MVt[];
 };
-layout(std430, binding = 5) buffer depthBuffer
+layout(std430, binding = 5) buffer depthHierarchy
 {
-    vec2 minMaxDepth[];
+    vec2 level0[8 * 4], // one 8*4 tile
+        level1[32 * 32], // 8*4 4*8 tiles
+        level2[256 * 128], // 32*32 8*4 tiles
+        level3[1024 * 1024]; // 256*128 4*8 tiles
 };
 layout(std430, binding = 6) buffer shadowBuffer
 {
@@ -41,7 +44,6 @@ layout(std430, binding = 6) buffer shadowBuffer
 };
 
 layout(rgba16f, binding = 0) restrict readonly uniform image2D texPos;
-layout(r32ui, binding = 1) restrict uniform uimage2D texShadow;
 
 struct Plane
 {
@@ -64,10 +66,9 @@ float testHyperplaneAABB(in Plane p, in vec4 bmin, in vec4 bmax)
     return sign(h) * float(abs(h) > dot(bmax - center, abs(p.n)));
 }
 
-// Tests whether a point is over, inside or under a hyperplane.
-float testHyperplanePoint(in Plane p, in vec4 v)
+bool pointOverHyperplane(in Plane p, in vec4 v)
 {
-    return sign(dot(v, p.n) - p.c);
+    return dot(v, p.n) - p.c > 0;
 }
 
 // 4D cross product
@@ -83,38 +84,85 @@ vec4 cross4(vec4 a, vec4 b, vec4 c)
 
 // GLSL has no recursion, so we have to inline all the 5 levels of the depth
 // buffer hierarchy. Resolutions are 8x4, 32x32, 256x128, 1024x1024, 8192x4096.
-const vec2 bufferTileSizes[5] = vec2[5](1. / vec2(8, 4), 1. / vec2(32, 32), 1. / vec2(256, 128),
-    1. / vec2(1024, 1024), 1. / vec2(8192, 4096));
+const ivec2 bufferTileSizes[5] = ivec2[5](ivec2(8, 4), ivec2(32, 32), ivec2(256, 128),
+    ivec2(1024, 1024), ivec2(8192, 4096));
 
 vec2 getClipSpaceTileSize(int level)
 {
     const vec2 factor = vec2(8192, 4096) / imageSize(texPos);
-    return bufferTileSizes[level] * factor;
+    return factor / bufferTileSizes[level];
+}
+
+int getIndexInHierarchy(int level, ivec2 tile)
+{
+    return int((32 << (level * 5) - 1) / 31) - 1
+        + tile.y * bufferTileSizes[level].x + tile.x;
+}
+
+vec2 getDepthsFromBuffer(int level, ivec2 tile)
+{
+    switch(level)
+    {
+    case 0:
+        return level0[tile.y * 8 + tile.x];
+    case 1:
+        return level1[tile.y * 32 + tile.x];
+    case 2:
+        return level2[tile.y * 256 + tile.x];
+    default:
+        return level3[tile.y * 1024 + tile.x];
+    }
 }
 
 // Tests a tile against a shadow volume in view space.
-// Returns -1, 0 or +1 depending on the tile being inside, saddled on or outside the SV.
+// Returns -1, 0 or +1 depending on the tile being inside, saddled on or outside
+// the SV respectively.
 float testSV(ShadowVolume sv, int level, ivec2 tile)
 {
     vec2 tileSize = getClipSpaceTileSize(level);
     vec4 tileMin, tileMax;
     tileMin.xy = vec2(-1.) + tile * tileSize;
     tileMax.xy = tileMin.xy + tileSize;
-    // TODO
-    return 1;
+    vec2 depths = getDepthsFromBuffer(level, tile);
+    tileMin.z = depths.x;
+    tileMax.z = depths.y;
+    // Homogeneous coordinates
+    tileMin.w = tileMax.w = 1;
+    tileMin = invP * tileMin;
+    tileMax = invP * tileMax;
+    // 4D coordinates
+    tileMin.w = tileMax.w = 0;
+    
+    float result = 0.;
+    bool outside = false;
+    for(int k = 0; k < 5; ++k)
+    {
+        float tresult = testHyperplaneAABB(sv.planes[k], tileMin, tileMax);
+        outside = outside || tresult > 0;
+        result += tresult;
+        if(allThreadsNV(outside))
+            return 1.;
+        
+    }
+    return outside ? 1. : (result == -5 ? -1. : 0.);
 }
 
 // Tests a view sample against a shadow volume in view space.
 bool testSVsample(ShadowVolume sv, ivec2 tile)
 {
-    // TODO
-    return false;
+    vec4 vs = imageLoad(texPos, tile);
+    bool result = false;
+    for(int k = 0; k < 5; ++k)
+        if(allThreadsNV(result = result || pointOverHyperplane(sv.planes[k], vs)))
+            return false;
+    return !result;
 }
 
 // Sets the shadow buffer bit for the given tile at the given level.
 void updateShadowBuffer(int level, ivec2 tile)
 {
-    // TODO
+    int offset = getIndexInHierarchy(level, tile);
+    atomicOr(shadows[offset >> 5], 1 << (31 - (offset & 0x1f)));
 }
 
 // Processes a subtile of the given parentTile. Which subtile
@@ -212,7 +260,7 @@ void main()
     //     (gl_WorkGroupID.x + gl_NumWorkGroups.x * (gl_WorkGroupID.y + gl_NumWorkGroups.y * gl_WorkGroupID.z));
     uint cellIndex = gl_GlobalInvocationID.x;
     
-    // Build shadow shadow volume
+    // Build shadow volume
     ShadowVolume sv;
     // Fetch cell-related data
     ivec4 cell = cells[cellIndex];
@@ -223,15 +271,15 @@ void main()
         center += (v[k] = objMV * vertices[cell[k]] + objMVt);
     center /= 4.;
     // Build shadow volume's planes as looking away from the centroid of the cell
-    for(int k = 0; k < 4; k++)
+    for(int k = 0; k < 4; ++k)
     {
         sv.planes[k].n = cross4(v[k] - uLightPos, v[(k + 1) % 4] - uLightPos,
             v[(k + 2) % 4] - uLightPos);
-        sv.planes[k].n = faceforward(sv.planes[k].n, uLightPos - center, sv.planes[k].n);
+        sv.planes[k].n = normalize(faceforward(sv.planes[k].n, uLightPos - center, sv.planes[k].n));
         sv.planes[k].c = dot(sv.planes[k].n, uLightPos);
     }
-    sv.planes[4].n = normalize(cross4(v[1] - v[0], v[2] - v[0], v[3] - v[0]));
-    sv.planes[4].n = faceforward(sv.planes[4].n, uLightPos - v[0], sv.planes[4].n);
+    sv.planes[4].n = cross4(v[1] - v[0], v[2] - v[0], v[3] - v[0]);
+    sv.planes[4].n = normalize(faceforward(sv.planes[4].n, uLightPos - v[0], sv.planes[4].n));
     sv.planes[4].c = dot(sv.planes[4].n, v[0]);
     
     traversal0(sv);

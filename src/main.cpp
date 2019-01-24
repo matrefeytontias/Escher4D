@@ -4,6 +4,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -16,6 +17,7 @@
 
 #include "Camera4.hpp"
 #include "FSQuadRenderContext.hpp"
+#include "HierarchicalBuffer.hpp"
 #include "OFFLoader.hpp"
 #include "Object4.hpp"
 #include "ShaderProgram.hpp"
@@ -43,8 +45,8 @@ static void mouseButtonCallback(GLFWwindow *window, int button, int action, int 
 }
 
 // Deferred rendering buffers and textures
-static GLuint gBuffer, dBuffer;
-Texture *texPos, *texNorm, *texColor;
+static GLuint gBuffer;
+Texture *texPos, *texNorm, *texColor, *texDepth;
 
 void setupDeferred(int w, int h)
 {
@@ -72,9 +74,11 @@ void setupDeferred(int w, int h)
         GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
     
-    glBindRenderbuffer(GL_RENDERBUFFER, dBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, dBuffer);
+    glBindTexture(GL_TEXTURE_2D, texDepth->id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texDepth->id, 0);
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -89,6 +93,7 @@ void complexDemo(Object4&);
 
 Object4 Object4::scene;
 
+// Tell the Nvidia driver to make itself useful
 extern "C" {
     __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
 }
@@ -97,7 +102,7 @@ int _main(int, char *argv[])
 {
     setwd(argv);
     
-    // Setup window
+    /// Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
     {
@@ -112,7 +117,7 @@ int _main(int, char *argv[])
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glfwSwapInterval(0); // no v-sync, live on the edge
     
-    // Setup ImGui binding
+    /// Setup ImGui binding
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
@@ -122,10 +127,11 @@ int _main(int, char *argv[])
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     
-    // Setup style
+    /// Setup style
     ImGui::StyleColorsDark();
     // ImGui::StyleColorsClassic();
     
+    /// Scene setup
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
@@ -220,7 +226,6 @@ int _main(int, char *argv[])
             tetrahedra += rc->geometry.cells.size() / 4;
     });
     
-    
     perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
     
     trace("Entering drawing loop");
@@ -233,7 +238,7 @@ int _main(int, char *argv[])
     
     scene.scale(Vector4f(10, 6, 10, 10)).pos(1) = 3;
     
-    // Setup deferred shading
+    /// Setup deferred shading
     ShaderProgram quadProgram;
     quadProgram.attach(GL_VERTEX_SHADER, "shaders/deferred_vert.glsl");
     quadProgram.attach(GL_FRAGMENT_SHADER, "shaders/deferred_frag.glsl");
@@ -242,28 +247,16 @@ int _main(int, char *argv[])
     texColor = &quadProgram.getTexture("texColor");
     
     glGenFramebuffers(1, &gBuffer);
-    glGenRenderbuffers(1, &dBuffer);
-    
-    setupDeferred(display_w, display_h);
     
     FSQuadRenderContext quadRC(quadProgram);
     
-    // Compute kernel setup
+    /// Setup compute kernel and related
+    /// Shadow hypervolume intersections
     std::vector<int> cellsCompBuffer; // ivec4
     std::vector<int> objIndexCompBuffer; // int
     std::vector<Vector4f> vertexCompBuffer; // vec4
     std::vector<Matrix4f> MCompBuffer; // mat4
     std::vector<Vector4f> MtCompBuffer; // vec4
-    GLuint texShadow;
-    glGenTextures(1, &texShadow);
-    glBindTexture(GL_TEXTURE_2D, texShadow);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, display_w / 32 + 1, display_h, 0,
-        GL_RED_INTEGER, GL_UNSIGNED_INT, NULL);
-    // Clear that texture with black
-    {
-        unsigned int bleh = 0;
-        glClearTexImage(texShadow, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &bleh);
-    }
     int objectIndex = 0;
     scene.visit([&](const Object4 &obj)
     {
@@ -284,28 +277,46 @@ int _main(int, char *argv[])
             }
         }
     });
-    // 0 : cells, 1 : object index, 2 : vertices, 3 : M matrices, 4 : translation part of M matrices
-    GLuint compBufferObjs[5];
-    glGenBuffers(5, compBufferObjs);
+    // 0 : cells, 1 : object index, 2 : vertices, 3 : M matrices, 4 : translation
+    // part of M matrices, 5 : depth hierarchy, 6 : shadow hierarchy
+    GLuint compBufferObjs[7];
+    
+    glGenBuffers(7, compBufferObjs);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[0]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, cellsCompBuffer.size() * sizeof(int), &cellsCompBuffer[0], GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[1]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, objIndexCompBuffer.size() * sizeof(int), &objIndexCompBuffer[0], GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[2]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, vertexCompBuffer.size() * sizeof(Vector4f), &vertexCompBuffer[0](0), GL_STATIC_DRAW);
-    for(unsigned int k = 0; k < 5; k++)
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[5]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, HierarchicalBuffer::offsets[4] * 2 * sizeof(float), NULL, GL_DYNAMIC_COPY);
+    // Shadow hierarchy has 1 bit per pixel but OpenGL needs ints, so divide every size by 32
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, (HierarchicalBuffer::offsets[4] + display_w * display_h) * sizeof(int) / 32, NULL, GL_DYNAMIC_COPY);
+    
+    for(unsigned int k = 0; k < 7; k++)
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, k, compBufferObjs[k]);
     
     ShaderProgram computeProgram;
     computeProgram.attach(GL_COMPUTE_SHADER, "shaders/test_compute.glsl");
     
+    /// Depth hierarchy building
+    ShaderProgram depthHierarchyProgram;
+    depthHierarchyProgram.attach(GL_COMPUTE_SHADER, "shaders/reduction_compute.glsl");
+    texDepth = &depthHierarchyProgram.getTexture("texDepth");
+    
+    /// Start draw loop
     int mwgcx, mwgcy, mwgcz;
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &mwgcx);
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &mwgcy);
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &mwgcz);
     trace("GPU allows for a maximum of (" << mwgcx << ", " << mwgcy << ", " << mwgcz << ") work groups");
     
+    setupDeferred(display_w, display_h);
+    
     glClearColor(0, 0, 0, 1);
+    
+    checkGLerror();
     
     while (!glfwWindowShouldClose(window))
     {
@@ -327,7 +338,19 @@ int _main(int, char *argv[])
         scene.render(camera);
         
         /// GPGPU fun
-        // Compute MV matrices for all meshes
+        // Generate depth hierarchy
+        depthHierarchyProgram.use();
+        depthHierarchyProgram.uniform2i("texSize", display_w, display_h);
+        glDispatchCompute(display_w / 8 + 1, display_h / 4 + 1, 1);
+        // glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        
+        // Clear shadow hierarchy
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
+        {
+            unsigned int bleh = 0;
+            glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED, GL_UNSIGNED_INT, &bleh);
+        }
+        // Compute MV transforms (matrix + translation) for all meshes
         MCompBuffer.clear();
         MtCompBuffer.clear();
         Transform4 vt = camera.computeViewTransform();
@@ -343,9 +366,9 @@ int _main(int, char *argv[])
         glBufferData(GL_SHADER_STORAGE_BUFFER, MCompBuffer.size() * sizeof(Matrix4f), MCompBuffer[0].data(), GL_STREAM_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[4]);
         glBufferData(GL_SHADER_STORAGE_BUFFER, MtCompBuffer.size() * sizeof(Vector4f), &MtCompBuffer[0](0), GL_STREAM_DRAW);
+        // Bind textures and whatnot
         computeProgram.use();
         glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-        glBindImageTexture(1, texShadow, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
         computeProgram.uniform4f("uLightPos", 0, 0, 0, 0);
         // glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
         
@@ -393,8 +416,7 @@ int _main(int, char *argv[])
             camera.update(dt);
     }
     
-    glDeleteBuffers(5, compBufferObjs);
-    glDeleteTextures(1, &texShadow);
+    glDeleteBuffers(7, compBufferObjs);
     
     trace("Exiting drawing loop");
     // Cleanup
