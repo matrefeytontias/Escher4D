@@ -46,8 +46,12 @@ static void mouseButtonCallback(GLFWwindow *window, int button, int action, int 
 
 // Deferred rendering buffers and textures
 static GLuint gBuffer;
-Texture *texPos, *texNorm, *texColor, *texDepth;
+static Texture *texPos, *texNorm, *texColor, *texDepth;
 
+/**
+ * Sets up internals (framebuffer and textures) for deferred rendering given
+ * framebuffer dimensions.
+ */
 void setupDeferred(int w, int h)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
@@ -93,8 +97,10 @@ void complexDemo(Object4&);
 
 Object4 Object4::scene;
 
-// Tell the Nvidia driver to make itself useful
 extern "C" {
+    /**
+     * Tell the Nvidia driver to make itself useful.
+     */
     __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
 }
 
@@ -140,7 +146,6 @@ int _main(int, char *argv[])
     
     Camera4 camera(window);
     camera.pos << 0, 1.5, 0, 0;
-    // camera.pos(2) = 5;
     
     Eigen::Matrix4f p(Eigen::Matrix4f::Identity());
     ShaderProgram program;
@@ -149,71 +154,75 @@ int _main(int, char *argv[])
     program.attach(GL_FRAGMENT_SHADER, "shaders/fragment.glsl");
     
     // Load geometry
-    std::vector<Eigen::Vector3f> vertices;
-    std::vector<unsigned int> tris, tetras;
-    // Cube
-    if(!OFFLoader::loadModel("models/cube", vertices, tris, tetras))
+    Geometry4 cubeGeometry, holedGeometry;
     {
-        trace("Can't load that shizzle");
-        return 0;
+        std::vector<Eigen::Vector3f> vertices;
+        std::vector<unsigned int> tris, tetras;
+        // Cube
+        if(!OFFLoader::loadModel("models/cube", vertices, tris, tetras))
+        {
+            trace("Can't load that shizzle");
+            return 0;
+        }
+        cubeGeometry.from3D(vertices, tetras);
+        for(unsigned int k = 0; k < cubeGeometry.vertices.size(); k++)
+            cubeGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
+        cubeGeometry.uploadGPU();
+        // Holed cube
+        if(!OFFLoader::loadModel("models/holedCube", vertices, tris, tetras))
+        {
+            trace("Can't load that shizzle");
+            return 0;
+        }
+        holedGeometry.from3D(vertices, tetras);
+        for(unsigned int k = 0; k < holedGeometry.vertices.size(); k++)
+            holedGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
+        holedGeometry.uploadGPU();
     }
-    Geometry4 cubeGeometry = Geometry4::from3D(vertices, tetras);
-    for(unsigned int k = 0; k < cubeGeometry.vertices.size(); k++)
-        cubeGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
-    cubeGeometry.uploadGPU();
-    Model4RenderContext cubeRC(cubeGeometry, program);
-    // Holed cube
-    if(!OFFLoader::loadModel("models/holedCube", vertices, tris, tetras))
-    {
-        trace("Can't load that shizzle");
-        return 0;
-    }
-    Geometry4 holedGeometry = Geometry4::from3D(vertices, tetras);
-    for(unsigned int k = 0; k < holedGeometry.vertices.size(); k++)
-        holedGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
-    holedGeometry.uploadGPU();
-    Model4RenderContext holedRC(holedGeometry, program);
+    Model4RenderContext cubeRC(cubeGeometry, program), holedRC(holedGeometry, program);
     
     // Build the complex
     Object4 &scene = Object4::scene;
-    // Build a single room
-    // 3 cells have a hole in them, respectively in the directions +X, +Z and +W
-    Object4 &room1 = scene.addChild();
-    for(unsigned int k = 0; k < 5; k++)
     {
-        room1.addChild(cubeRC);
-        room1[k].color << 1, 1, 1, 1;
+        // Build a single room
+        // 3 cells have a hole in them, respectively in the directions +X, +Z and +W
+        Object4 &room1 = scene.addChild();
+        for(unsigned int k = 0; k < 5; k++)
+        {
+            room1.addChild(cubeRC);
+            room1[k].color << 1, 1, 1, 1;
+        }
+        room1.addChild(holedRC);
+        room1[5].color << 1, 0, 0, 1;
+        room1.addChild(holedRC);
+        room1[6].color << 0, 1, 0, 1;
+        room1.addChild(holedRC);
+        room1[7].color << 0, 0, 1, 1;
+        
+        // +X
+        room1[5].pos(0) = .5;
+        room1[5].rotate(XW, -M_PI / 2);
+        // -X
+        room1[0].pos(0) = -.5;
+        room1[0].rotate(XW, M_PI / 2);
+        // +Y
+        room1[1].pos(1) = .5;
+        room1[1].rotate(YW, -M_PI / 2);
+        // -Y
+        room1[2].pos(1) = -.5;
+        room1[2].rotate(YW, M_PI / 2);
+        // +Z
+        room1[6].pos(2) = .5;
+        room1[6].rotate(ZW, -M_PI / 2);
+        // -Z
+        room1[3].pos(2) = -.5;
+        room1[3].rotate(ZW, M_PI / 2);
+        // +W
+        room1[7].pos(3) = .5;
+        // -W
+        room1[4].pos(3) = -.5;
+        room1[4].rotate(XW, M_PI); // 180° rotation, any axis + W
     }
-    room1.addChild(holedRC);
-    room1[5].color << 1, 0, 0, 1;
-    room1.addChild(holedRC);
-    room1[6].color << 0, 1, 0, 1;
-    room1.addChild(holedRC);
-    room1[7].color << 0, 0, 1, 1;
-    
-    // +X
-    room1[5].pos(0) = .5;
-    room1[5].rotate(XW, -M_PI / 2);
-    // -X
-    room1[0].pos(0) = -.5;
-    room1[0].rotate(XW, M_PI / 2);
-    // +Y
-    room1[1].pos(1) = .5;
-    room1[1].rotate(YW, -M_PI / 2);
-    // -Y
-    room1[2].pos(1) = -.5;
-    room1[2].rotate(YW, M_PI / 2);
-    // +Z
-    room1[6].pos(2) = .5;
-    room1[6].rotate(ZW, -M_PI / 2);
-    // -Z
-    room1[3].pos(2) = -.5;
-    room1[3].rotate(ZW, M_PI / 2);
-    // +W
-    room1[7].pos(3) = .5;
-    // -W
-    room1[4].pos(3) = -.5;
-    room1[4].rotate(XW, M_PI); // 180° rotation, any axis + W
     
     complexDemo(scene);
     
@@ -257,6 +266,7 @@ int _main(int, char *argv[])
     std::vector<Vector4f> vertexCompBuffer; // vec4
     std::vector<Matrix4f> MCompBuffer; // mat4
     std::vector<Vector4f> MtCompBuffer; // vec4
+    
     int objectIndex = 0;
     scene.visit([&](const Object4 &obj)
     {
@@ -277,6 +287,7 @@ int _main(int, char *argv[])
             }
         }
     });
+    
     // 0 : cells, 1 : object index, 2 : vertices, 3 : M matrices, 4 : translation
     // part of M matrices, 5 : depth hierarchy, 6 : shadow hierarchy
     GLuint compBufferObjs[7];
@@ -306,17 +317,18 @@ int _main(int, char *argv[])
     texDepth = &depthHierarchyProgram.getTexture("texDepth");
     
     /// Start draw loop
-    int mwgcx, mwgcy, mwgcz;
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &mwgcx);
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &mwgcy);
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &mwgcz);
-    trace("GPU allows for a maximum of (" << mwgcx << ", " << mwgcy << ", " << mwgcz << ") work groups");
+    
+    {
+        int mwgcx, mwgcy, mwgcz;
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &mwgcx);
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &mwgcy);
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &mwgcz);
+        trace("GPU allows for a maximum of (" << mwgcx << ", " << mwgcy << ", " << mwgcz << ") work groups");
+    }
     
     setupDeferred(display_w, display_h);
     
     glClearColor(0, 0, 0, 1);
-    
-    checkGLerror();
     
     while (!glfwWindowShouldClose(window))
     {
@@ -342,7 +354,7 @@ int _main(int, char *argv[])
         depthHierarchyProgram.use();
         depthHierarchyProgram.uniform2i("texSize", display_w, display_h);
         glDispatchCompute(display_w / 8 + 1, display_h / 4 + 1, 1);
-        // glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         
         // Clear shadow hierarchy
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
@@ -353,14 +365,16 @@ int _main(int, char *argv[])
         // Compute MV transforms (matrix + translation) for all meshes
         MCompBuffer.clear();
         MtCompBuffer.clear();
-        Transform4 vt = camera.computeViewTransform();
-        scene.visit<Transform4>([&](const Object4 &obj, Transform4 &vt)
         {
-            Transform4 mv = obj.chain(vt);
-            MCompBuffer.push_back(mv.mat);
-            MtCompBuffer.push_back(mv.pos);
-            return mv;
-        }, vt);
+            Transform4 vt = camera.computeViewTransform();
+            scene.visit<Transform4>([&](const Object4 &obj, Transform4 &vt)
+            {
+                Transform4 mv = obj.chain(vt);
+                MCompBuffer.push_back(mv.mat);
+                MtCompBuffer.push_back(mv.pos);
+                return mv;
+            }, vt);
+        }
         
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[3]);
         glBufferData(GL_SHADER_STORAGE_BUFFER, MCompBuffer.size() * sizeof(Matrix4f), MCompBuffer[0].data(), GL_STREAM_DRAW);

@@ -35,15 +35,12 @@ struct Geometry4
      * @param   v3      array of 3D vertices
      * @param   tetras  array of tetrahedron indices
      */
-    static Geometry4 from3D(const std::vector<Vector3f> &v3, const std::vector<unsigned int> &tetras)
+    void from3D(const std::vector<Vector3f> &v3, const std::vector<unsigned int> &tetras)
     {
-        Geometry4 g;
-        
+        vertices.clear();
         for(const Vector3f &v : v3)
-            g.vertices.push_back(Vector4f(v(0), v(1), v(2), 0));
-        g.cells.assign(tetras.begin(), tetras.end());
-        
-        return g;
+            vertices.push_back(Vector4f(v(0), v(1), v(2), 0));
+        cells.assign(tetras.begin(), tetras.end());
     }
     
     /**
@@ -54,39 +51,37 @@ struct Geometry4
      * @param   tetras  array of tetrahedron indices
      * @param   duth    amount of extrusion along the W axis
      */
-    static Geometry4 from3D(const std::vector<Vector3f> &v3, const std::vector<unsigned int> &tris,
+    void from3D(const std::vector<Vector3f> &v3, const std::vector<unsigned int> &tris,
         const std::vector<unsigned int> &tetras, float duth)
     {
-        Geometry4 g;
+        vertices.clear();
         int base = v3.size();
         float d = duth / 2;
         
         for(const Vector3f &v : v3)
         {
             Vector4f v4(v(0), v(1), v(2), -d);
-            g.vertices.push_back(v4);
+            vertices.push_back(v4);
         }
         
-        g.cells.insert(g.cells.begin(), tetras.begin(), tetras.end());
+        cells.insert(cells.begin(), tetras.begin(), tetras.end());
         for(int t : tetras)
-            g.cells.push_back(t + base);
+            cells.push_back(t + base);
         
         for(const Vector3f &v : v3)
         {
             Vector4f v4(v(0), v(1), v(2), d);
-            g.vertices.push_back(v4);
+            vertices.push_back(v4);
         }
         
         for(unsigned int k = 0; k < tris.size(); k += 3)
         {
             int a = tris[k], b = tris[k + 1], c = tris[k + 2],
                 d = a + base, e = b + base, f = c + base;
-            g.pushCell(a, c, e, d);
-            g.pushCell(b, e, c, a);
-            g.pushCell(c, e, f, d);
+            pushCell(a, c, e, d);
+            pushCell(b, e, c, a);
+            pushCell(c, e, f, d);
         }
-        
-        return g;
     }
     
     /**
