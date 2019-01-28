@@ -330,6 +330,11 @@ int _main(int, char *argv[])
     
     glClearColor(0, 0, 0, 1);
     
+    // DEBUG : DEPTH DISPLAY TEST
+    quadProgram.registerTexture("texDepth", *texDepth);
+    bool displayDepth = false, displayDepthMin = true;
+    int depthLevel = 4;
+    
     while (!glfwWindowShouldClose(window))
     {
         glfwGetFramebufferSize(window, &display_w, &display_h);
@@ -394,6 +399,9 @@ int _main(int, char *argv[])
         quadProgram.uniform1f("uLightIntensity", lightIntensity);
         quadProgram.uniform1f("uLightRadius", lightRadius);
         quadProgram.uniform4f("uLightPos", 0, 0, 0, 0);
+        quadProgram.uniform1i("uDisplayDepth", displayDepth);
+        quadProgram.uniform1i("uDepthLevel", depthLevel);
+        quadProgram.uniform1i("uMin", displayDepthMin);
         quadRC.render();
         
         ImGui_ImplGlfwGL3_NewFrame();
@@ -420,6 +428,16 @@ int _main(int, char *argv[])
             ImGui::Text("Camera position : %lf, %lf, %lf, %lf",
                 camera.pos(0), camera.pos(1), camera.pos(2), camera.pos(3));
             ImGui::Text("Camera rotation : %lf, %lf, %lf", camera._xz, camera._yz, camera._xwzw);
+            ImGui::Separator();
+            ImGui::Checkbox("Display depth hierarchy", &displayDepth);
+            if(displayDepth)
+            {
+                ImGui::SliderInt("Depth hierarchy level", &depthLevel, 0, 4);
+                static int currentItem = 0;
+                ImGui::RadioButton("Min depth", &currentItem, 0); ImGui::SameLine();
+                ImGui::RadioButton("Max depth", &currentItem, 1);
+                displayDepthMin = !currentItem;
+            }
         ImGui::End();
                 
         ImGui::Render();
