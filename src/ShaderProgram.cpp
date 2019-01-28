@@ -95,6 +95,11 @@ void ShaderProgram::uniform4f(const string &name, float v1, float v2, float v3, 
     glUniform4f(ensureUniform(name), v1, v2, v3, v4);
 }
 
+void ShaderProgram::uniform1i(const string &name, int i)
+{
+    glUniform1i(ensureUniform(name), i);
+}
+
 void ShaderProgram::uniform2i(const string &name, int i1, int i2)
 {
     glUniform2i(ensureUniform(name), i1, i2);
