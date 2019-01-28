@@ -11,6 +11,8 @@ uniform vec4 uLightPos;
 // Inverse projection matrix
 uniform mat4 invP;
 
+uniform ivec2 texSize;
+
 layout(std430, binding = 0) buffer cellBuffer
 {
     ivec4 cells[];
@@ -33,14 +35,19 @@ layout(std430, binding = 4) buffer MVtBuffer
 };
 layout(std430, binding = 5) buffer depthHierarchy
 {
-    vec2 level0[8 * 4], // one 8*4 tile
-        level1[32 * 32], // 8*4 4*8 tiles
-        level2[256 * 128], // 32*32 8*4 tiles
-        level3[1024 * 1024]; // 256*128 4*8 tiles
+    vec2 dlevel0[8 * 4], // one 8*4 tile
+        dlevel1[32 * 32], // 8*4 4*8 tiles
+        dlevel2[256 * 128], // 32*32 8*4 tiles
+        dlevel3[1024 * 1024]; // 256*128 4*8 tiles
 };
+// The shadow buffer has 1 bit per pixel, so use uint and use 32 times fewer bytes.
 layout(std430, binding = 6) buffer shadowBuffer
 {
-    uint shadows[];
+    uint slevel0[8 * 4 >> 5],
+        slevel1[32 * 32 >> 5],
+        slevel2[256 * 128 >> 5],
+        slevel3[1024 * 1024 >> 5],
+        slevel4[];
 };
 
 layout(rgba16f, binding = 0) restrict readonly uniform image2D texPos;
@@ -93,24 +100,18 @@ vec2 getClipSpaceTileSize(int level)
     return factor / bufferTileSizes[level];
 }
 
-int getIndexInHierarchy(int level, ivec2 tile)
-{
-    return int((32 << (level * 5) - 1) / 31) - 1
-        + tile.y * bufferTileSizes[level].x + tile.x;
-}
-
 vec2 getDepthsFromBuffer(int level, ivec2 tile)
 {
     switch(level)
     {
     case 0:
-        return level0[tile.y * 8 + tile.x];
+        return dlevel0[tile.y * 8 + tile.x];
     case 1:
-        return level1[tile.y * 32 + tile.x];
+        return dlevel1[tile.y * 32 + tile.x];
     case 2:
-        return level2[tile.y * 256 + tile.x];
+        return dlevel2[tile.y * 256 + tile.x];
     default:
-        return level3[tile.y * 1024 + tile.x];
+        return dlevel3[tile.y * 1024 + tile.x];
     }
 }
 
@@ -161,8 +162,30 @@ bool testSVsample(ShadowVolume sv, ivec2 tile)
 // Sets the shadow buffer bit for the given tile at the given level.
 void updateShadowBuffer(int level, ivec2 tile)
 {
-    int offset = getIndexInHierarchy(level, tile);
-    atomicOr(shadows[offset >> 5], 1 << (31 - (offset & 0x1f)));
+    int offset;
+    switch(level)
+    {
+    case 0:
+        offset = tile.y * 8 + tile.x;
+        atomicOr(slevel0[offset >> 5], 1 << (31 - (offset & 0x1f)));
+        break;
+    case 1:
+        offset = tile.y * 32 + tile.x;
+        atomicOr(slevel1[offset >> 5], 1 << (31 - (offset & 0x1f)));
+        break;
+    case 2:
+        offset = tile.y * 256 + tile.x;
+        atomicOr(slevel2[offset >> 5], 1 << (31 - (offset & 0x1f)));
+        break;
+    case 3:
+        offset = tile.y * 1024 + tile.x;
+        atomicOr(slevel3[offset >> 5], 1 << (31 - (offset & 0x1f)));
+        break;
+    default:
+        offset = tile.y * texSize.x + tile.x;
+        atomicOr(slevel4[offset >> 5], 1 << (31 - (offset & 0x1f)));
+        break;
+    }
 }
 
 // Processes a subtile of the given parentTile. Which subtile
@@ -255,9 +278,6 @@ void traversal0(ShadowVolume sv)
 
 void main()
 {
-    // There's no way we can ever reach that many tetrahedra but hey you never know right
-    // uint invocationIndex = gl_LocalInvocationIndex + workGroupSize *
-    //     (gl_WorkGroupID.x + gl_NumWorkGroups.x * (gl_WorkGroupID.y + gl_NumWorkGroups.y * gl_WorkGroupID.z));
     uint cellIndex = gl_GlobalInvocationID.x;
     
     // Build shadow volume

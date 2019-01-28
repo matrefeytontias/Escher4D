@@ -353,7 +353,7 @@ int _main(int, char *argv[])
         // Generate depth hierarchy
         depthHierarchyProgram.use();
         depthHierarchyProgram.uniform2i("texSize", display_w, display_h);
-        glDispatchCompute(display_w / 8 + 1, display_h / 4 + 1, 1);
+        glDispatchCompute((display_w + 7) / 8, (display_h  + 3) / 4, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         
         // Clear shadow hierarchy
