@@ -286,6 +286,7 @@ int _main(int, char *argv[])
                 vertexCompBuffer.insert(vertexCompBuffer.end(), geom.vertices.begin(), geom.vertices.end());
             }
         }
+        objectIndex++;
     });
     
     // 0 : cells, 1 : object index, 2 : vertices, 3 : M matrices, 4 : translation
@@ -301,7 +302,7 @@ int _main(int, char *argv[])
     glBufferData(GL_SHADER_STORAGE_BUFFER, vertexCompBuffer.size() * sizeof(Vector4f), &vertexCompBuffer[0](0), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[5]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, HierarchicalBuffer::offsets[4] * 2 * sizeof(float), NULL, GL_DYNAMIC_COPY);
-    // Shadow hierarchy has 1 bit per pixel but OpenGL needs ints, so divide every size by 32
+    // Shadow hierarchy has 1 bit per pixel but OpenGL needs ints, so divide the size by 32
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, (HierarchicalBuffer::offsets[4] + display_w * display_h) * sizeof(int) / 32, NULL, GL_DYNAMIC_COPY);
     
@@ -317,7 +318,6 @@ int _main(int, char *argv[])
     texDepth = &depthHierarchyProgram.getTexture("texDepth");
     
     /// Start draw loop
-    
     {
         int mwgcx, mwgcy, mwgcz;
         glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &mwgcx);
@@ -339,6 +339,7 @@ int _main(int, char *argv[])
     {
         glfwGetFramebufferSize(window, &display_w, &display_h);
         setAspectRatio(p, (float)display_w / display_h);
+        Matrix4f invP = p.inverse();
         
         /// Render scene on framebuffer for deferred shading
         glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
@@ -347,6 +348,10 @@ int _main(int, char *argv[])
         
         float now = glfwGetTime(), dt = now - timeBase;
         timeBase = now;
+        
+        Vector4f lightPos;
+        // lightPos << sin(now) * 5 + 5, 1.5, 0, 0;
+        lightPos << 0, 1.5, 0, 0;
         
         program.use();
         
@@ -357,9 +362,8 @@ int _main(int, char *argv[])
         /// GPGPU fun
         // Generate depth hierarchy
         depthHierarchyProgram.use();
-        depthHierarchyProgram.uniform2i("texSize", display_w, display_h);
+        depthHierarchyProgram.uniform2i("uTexSize", display_w, display_h);
         glDispatchCompute((display_w + 7) / 8, (display_h  + 3) / 4, 1);
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         
         // Clear shadow hierarchy
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
@@ -372,6 +376,8 @@ int _main(int, char *argv[])
         MtCompBuffer.clear();
         {
             Transform4 vt = camera.computeViewTransform();
+            // Compute the light's view-space position while we're at it
+            lightPos = vt.apply(lightPos);
             scene.visit<Transform4>([&](const Object4 &obj, Transform4 &vt)
             {
                 Transform4 mv = obj.chain(vt);
@@ -388,8 +394,11 @@ int _main(int, char *argv[])
         // Bind textures and whatnot
         computeProgram.use();
         glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-        computeProgram.uniform4f("uLightPos", 0, 0, 0, 0);
-        // glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
+        computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
+        computeProgram.uniform2i("uTexSize", display_w, display_h);
+        computeProgram.uniformMatrix4fv("invP", 1, invP.data());
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
         
         /// Deferred rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -398,10 +407,12 @@ int _main(int, char *argv[])
         quadProgram.use();
         quadProgram.uniform1f("uLightIntensity", lightIntensity);
         quadProgram.uniform1f("uLightRadius", lightRadius);
-        quadProgram.uniform4f("uLightPos", 0, 0, 0, 0);
+        quadProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
         quadProgram.uniform1i("uDisplayDepth", displayDepth);
         quadProgram.uniform1i("uDepthLevel", depthLevel);
         quadProgram.uniform1i("uMin", displayDepthMin);
+        quadProgram.uniform2i("uTexSize", display_w, display_h);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         quadRC.render();
         
         ImGui_ImplGlfwGL3_NewFrame();

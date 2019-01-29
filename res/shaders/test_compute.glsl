@@ -2,8 +2,7 @@
 #extension GL_NV_gpu_shader5 : require
 #extension GL_NV_shader_thread_group : require
 
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
-const uint workGroupSize = gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z;
+layout(local_size_x = 32) in;
 
 // Light position in camera space
 uniform vec4 uLightPos;
@@ -11,7 +10,7 @@ uniform vec4 uLightPos;
 // Inverse projection matrix
 uniform mat4 invP;
 
-uniform ivec2 texSize;
+uniform ivec2 uTexSize;
 
 layout(std430, binding = 0) buffer cellBuffer
 {
@@ -92,12 +91,19 @@ vec4 cross4(vec4 a, vec4 b, vec4 c)
 // GLSL has no recursion, so we have to inline all the 5 levels of the depth
 // buffer hierarchy. Resolutions are 8x4, 32x32, 256x128, 1024x1024, 8192x4096.
 const ivec2 bufferTileSizes[5] = ivec2[5](ivec2(8, 4), ivec2(32, 32), ivec2(256, 128),
-    ivec2(1024, 1024), ivec2(8192, 4096));
+    ivec2(1024, 1024), ivec2(8192, 4096)),
+    fragmentTileSizes[5] = ivec2[5](ivec2(1024, 1024), ivec2(256, 128), ivec2(32, 32),
+    ivec2(8, 4), ivec2(1, 1));
+
+bool tileInScreen(int level, ivec2 tile)
+{
+    ivec2 extent = tile * fragmentTileSizes[level];
+    return extent.x < uTexSize.x && extent.y < uTexSize.y;
+}
 
 vec2 getClipSpaceTileSize(int level)
 {
-    const vec2 factor = vec2(8192, 4096) / imageSize(texPos);
-    return factor / bufferTileSizes[level];
+    return fragmentTileSizes[level] * 2. / uTexSize;
 }
 
 vec2 getDepthsFromBuffer(int level, ivec2 tile)
@@ -105,13 +111,13 @@ vec2 getDepthsFromBuffer(int level, ivec2 tile)
     switch(level)
     {
     case 0:
-        return dlevel0[tile.y * 8 + tile.x];
+        return dlevel0[(tile.y << 3) + tile.x];
     case 1:
-        return dlevel1[tile.y * 32 + tile.x];
+        return dlevel1[(tile.y << 5) + tile.x];
     case 2:
-        return dlevel2[tile.y * 256 + tile.x];
+        return dlevel2[(tile.y << 8) + tile.x];
     default:
-        return dlevel3[tile.y * 1024 + tile.x];
+        return dlevel3[(tile.y << 10) + tile.x];
     }
 }
 
@@ -141,8 +147,6 @@ float testSV(ShadowVolume sv, int level, ivec2 tile)
         float tresult = testHyperplaneAABB(sv.planes[k], tileMin, tileMax);
         outside = outside || tresult > 0;
         result += tresult;
-        if(allThreadsNV(outside))
-            return 1.;
         
     }
     return outside ? 1. : (result == -5 ? -1. : 0.);
@@ -154,8 +158,7 @@ bool testSVsample(ShadowVolume sv, ivec2 tile)
     vec4 vs = imageLoad(texPos, tile);
     bool result = false;
     for(int k = 0; k < 5; ++k)
-        if(allThreadsNV(result = result || pointOverHyperplane(sv.planes[k], vs)))
-            return false;
+        result = result || pointOverHyperplane(sv.planes[k], vs);
     return !result;
 }
 
@@ -166,23 +169,23 @@ void updateShadowBuffer(int level, ivec2 tile)
     switch(level)
     {
     case 0:
-        offset = tile.y * 8 + tile.x;
+        offset = (tile.y << 3) + tile.x;
         atomicOr(slevel0[offset >> 5], 1 << (31 - (offset & 0x1f)));
         break;
     case 1:
-        offset = tile.y * 32 + tile.x;
+        offset = (tile.y << 5) + tile.x;
         atomicOr(slevel1[offset >> 5], 1 << (31 - (offset & 0x1f)));
         break;
     case 2:
-        offset = tile.y * 256 + tile.x;
+        offset = (tile.y << 8) + tile.x;
         atomicOr(slevel2[offset >> 5], 1 << (31 - (offset & 0x1f)));
         break;
     case 3:
-        offset = tile.y * 1024 + tile.x;
+        offset = (tile.y << 10) + tile.x;
         atomicOr(slevel3[offset >> 5], 1 << (31 - (offset & 0x1f)));
         break;
     default:
-        offset = tile.y * texSize.x + tile.x;
+        offset = tile.y * uTexSize.x + tile.x;
         atomicOr(slevel4[offset >> 5], 1 << (31 - (offset & 0x1f)));
         break;
     }
@@ -191,11 +194,16 @@ void updateShadowBuffer(int level, ivec2 tile)
 // Processes a subtile of the given parentTile. Which subtile
 // is determined by the lane ID.
 
+shared bool subTileIntersects[32];
+
 // Level 4 (final level)
 void traversal4(ShadowVolume sv, ivec2 parentTile)
 {
     const int level = 4;
-    ivec2 tile = parentTile * ivec2(8, 4) + ivec2(gl_ThreadInWarpNV % 8, gl_ThreadInWarpNV / 8);
+    ivec2 tile = parentTile * ivec2(8, 4) + ivec2(gl_ThreadInWarpNV & 7, gl_ThreadInWarpNV >> 3);
+    
+    if(!tileInScreen(level, tile))
+        return;
     
     if(testSVsample(sv, tile))
         updateShadowBuffer(level, tile);
@@ -205,18 +213,22 @@ void traversal4(ShadowVolume sv, ivec2 parentTile)
 void traversal3(ShadowVolume sv, ivec2 parentTile)
 {
     const int level = 3;
-    ivec2 tile = parentTile * ivec2(4, 8) + ivec2(gl_ThreadInWarpNV % 4, gl_ThreadInWarpNV / 4);
+    ivec2 tile = parentTile * ivec2(4, 8) + ivec2(gl_ThreadInWarpNV & 3, gl_ThreadInWarpNV >> 2);
+    
+    if(!tileInScreen(level, tile))
+        return;
     
     float intersects = testSV(sv, level, tile);
     
-    if(intersects > 0.)
+    if(intersects < 0.)
         updateShadowBuffer(level, tile);
     else
     {
         uint queue = ballotThreadNV(intersects == 0.);
+        
         for(int k = 0; k < 32; k++)
             if((queue & (1 << k)) != 0)
-                traversal4(sv, parentTile * ivec2(4, 8) + ivec2(k % 4, k / 4));
+                traversal4(sv, parentTile * ivec2(4, 8) + ivec2(k & 3, k >> 2));
     }
 }
 
@@ -224,18 +236,22 @@ void traversal3(ShadowVolume sv, ivec2 parentTile)
 void traversal2(ShadowVolume sv, ivec2 parentTile)
 {
     const int level = 2;
-    ivec2 tile = parentTile * ivec2(8, 4) + ivec2(gl_ThreadInWarpNV % 8, gl_ThreadInWarpNV / 8);
+    ivec2 tile = parentTile * ivec2(8, 4) + ivec2(gl_ThreadInWarpNV & 7, gl_ThreadInWarpNV >> 3);
+    
+    if(!tileInScreen(level, tile))
+        return;
     
     float intersects = testSV(sv, level, tile);
     
-    if(intersects > 0.)
+    if(intersects < 0.)
         updateShadowBuffer(level, tile);
     else
     {
         uint queue = ballotThreadNV(intersects == 0.);
+        
         for(int k = 0; k < 32; k++)
             if((queue & (1 << k)) != 0)
-                traversal3(sv, parentTile * ivec2(8, 4) + ivec2(k % 8, k / 8));
+                traversal3(sv, parentTile * ivec2(8, 4) + ivec2(k & 7, k >> 3));
     }
 }
 
@@ -243,18 +259,22 @@ void traversal2(ShadowVolume sv, ivec2 parentTile)
 void traversal1(ShadowVolume sv, ivec2 parentTile)
 {
     const int level = 1;
-    ivec2 tile = parentTile * ivec2(4, 8) + ivec2(gl_ThreadInWarpNV % 4, gl_ThreadInWarpNV / 4);
+    ivec2 tile = parentTile * ivec2(4, 8) + ivec2(gl_ThreadInWarpNV & 3, gl_ThreadInWarpNV >> 2);
+    
+    if(!tileInScreen(level, tile))
+        return;
     
     float intersects = testSV(sv, level, tile);
     
-    if(intersects > 0.)
+    if(intersects < 0.)
         updateShadowBuffer(level, tile);
     else
     {
         uint queue = ballotThreadNV(intersects == 0.);
+        
         for(int k = 0; k < 32; k++)
             if((queue & (1 << k)) != 0)
-                traversal2(sv, parentTile * ivec2(4, 8) + ivec2(k % 4, k / 4));
+                traversal2(sv, parentTile * ivec2(4, 8) + ivec2(k & 3, k >> 2));
     }
 }
 
@@ -262,7 +282,10 @@ void traversal1(ShadowVolume sv, ivec2 parentTile)
 void traversal0(ShadowVolume sv)
 {
     const int level = 0;
-    ivec2 tile = ivec2(gl_ThreadInWarpNV % 8, gl_ThreadInWarpNV / 8);
+    ivec2 tile = ivec2(gl_ThreadInWarpNV & 7, gl_ThreadInWarpNV >> 3);
+    
+    if(!tileInScreen(level, tile))
+        return;
     
     float intersects = testSV(sv, level, tile);
     if(intersects < 0.)
@@ -270,15 +293,16 @@ void traversal0(ShadowVolume sv)
     else
     {
         uint queue = ballotThreadNV(intersects == 0.);
+        
         for(int k = 0; k < 32; k++)
             if((queue & (1 << k)) != 0)
-                traversal1(sv, ivec2(k % 8, k / 8));
+                traversal1(sv, ivec2(k & 7, k >> 3));
     }
 }
 
 void main()
 {
-    uint cellIndex = gl_GlobalInvocationID.x;
+    uint cellIndex = gl_WorkGroupID.x;
     
     // Build shadow volume
     ShadowVolume sv;
@@ -293,14 +317,16 @@ void main()
     // Build shadow volume's planes as looking away from the centroid of the cell
     for(int k = 0; k < 4; ++k)
     {
-        sv.planes[k].n = cross4(v[k] - uLightPos, v[(k + 1) % 4] - uLightPos,
-            v[(k + 2) % 4] - uLightPos);
-        sv.planes[k].n = normalize(faceforward(sv.planes[k].n, uLightPos - center, sv.planes[k].n));
+        sv.planes[k].n = cross4(v[k] - uLightPos, v[(k + 1) & 3] - uLightPos,
+            v[(k + 2) & 3] - uLightPos);
+        sv.planes[k].n = normalize(sv.planes[k].n * sign(dot(uLightPos - center, sv.planes[k].n)));
         sv.planes[k].c = dot(sv.planes[k].n, uLightPos);
     }
     sv.planes[4].n = cross4(v[1] - v[0], v[2] - v[0], v[3] - v[0]);
-    sv.planes[4].n = normalize(faceforward(sv.planes[4].n, uLightPos - v[0], sv.planes[4].n));
-    sv.planes[4].c = dot(sv.planes[4].n, v[0]);
+    sv.planes[4].n = normalize(sv.planes[4].n * sign(dot(uLightPos - v[0], sv.planes[4].n)));
+    // Slightly lower the plane to avoid self-shadowing
+    sv.planes[4].c = dot(sv.planes[4].n, v[0] - sv.planes[4].n * 0.001);
     
-    traversal0(sv);
+    // traversal0(sv);
+    updateShadowBuffer(4, ivec2(640, 360));
 }

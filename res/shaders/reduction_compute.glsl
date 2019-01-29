@@ -1,7 +1,7 @@
 #version 430
 
 uniform sampler2D texDepth;
-uniform ivec2 texSize;
+uniform ivec2 uTexSize;
 
 // Each tile holds the min and max depth of the subtiles in the level under it.
 // Each tile holds 32 items and is 8*4 or 4*8 depending on the level. Conceptually,
@@ -41,7 +41,7 @@ void main()
     const uint tid = gl_LocalInvocationID.x;
     const ivec2 parentTile = ivec2(gl_WorkGroupID.xy);
     
-    ivec2 texSizeNextLevel = texSize;
+    ivec2 texSizeNextLevel = uTexSize;
     // For this level, clipping against parentTile is done at the dispatch level
     // with dispatchCompute(display_w / 8, display_h / 4, 1).
     // Still, define it here for consistency's sake
