@@ -133,10 +133,12 @@ float testSV(ShadowVolume sv, int level, ivec2 tile)
     vec2 depths = getDepthsFromBuffer(level, tile);
     tileMin.z = depths.x;
     tileMax.z = depths.y;
-    // Homogeneous coordinates
+    // Go from clip space to view space using homogeneous coordinates
     tileMin.w = tileMax.w = 1;
     tileMin = invP * tileMin;
     tileMax = invP * tileMax;
+    tileMin /= tileMin.w;
+    tileMax /= tileMax.w;
     // 4D coordinates
     tileMin.w = tileMax.w = 0;
     
