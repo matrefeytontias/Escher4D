@@ -140,6 +140,10 @@ float testSV(ShadowVolume sv, int level, ivec2 tile)
     // 4D coordinates
     tileMin.w = tileMax.w = 0;
     
+    vec4 temp = min(tileMin, tileMax);
+    tileMax = max(tileMin, tileMax);
+    tileMin = temp;
+    
     float result = 0.;
     bool outside = false;
     for(int k = 0; k < 5; ++k)
@@ -215,21 +219,15 @@ void traversal3(ShadowVolume sv, ivec2 parentTile)
     const int level = 3;
     ivec2 tile = parentTile * ivec2(4, 8) + ivec2(gl_ThreadInWarpNV & 3, gl_ThreadInWarpNV >> 2);
     
-    if(!tileInScreen(level, tile))
-        return;
-    
-    float intersects = testSV(sv, level, tile);
+    float intersects = tileInScreen(level, tile) ? testSV(sv, level, tile) : 1.;
     
     if(intersects < 0.)
         updateShadowBuffer(level, tile);
-    else
-    {
-        uint queue = ballotThreadNV(intersects == 0.);
-        
-        for(int k = 0; k < 32; k++)
-            if((queue & (1 << k)) != 0)
-                traversal4(sv, parentTile * ivec2(4, 8) + ivec2(k & 3, k >> 2));
-    }
+    
+    uint queue = ballotThreadNV(intersects == 0.);
+    for(int k = 0; k < 32; k++)
+        if((queue & (1 << k)) != 0)
+            traversal4(sv, parentTile * ivec2(4, 8) + ivec2(k & 3, k >> 2));
 }
 
 // Level 2
@@ -238,21 +236,15 @@ void traversal2(ShadowVolume sv, ivec2 parentTile)
     const int level = 2;
     ivec2 tile = parentTile * ivec2(8, 4) + ivec2(gl_ThreadInWarpNV & 7, gl_ThreadInWarpNV >> 3);
     
-    if(!tileInScreen(level, tile))
-        return;
-    
-    float intersects = testSV(sv, level, tile);
+    float intersects = tileInScreen(level, tile) ? testSV(sv, level, tile) : 1.;
     
     if(intersects < 0.)
         updateShadowBuffer(level, tile);
-    else
-    {
-        uint queue = ballotThreadNV(intersects == 0.);
-        
-        for(int k = 0; k < 32; k++)
-            if((queue & (1 << k)) != 0)
-                traversal3(sv, parentTile * ivec2(8, 4) + ivec2(k & 7, k >> 3));
-    }
+    
+    uint queue = ballotThreadNV(intersects == 0.);
+    for(int k = 0; k < 32; k++)
+        if((queue & (1 << k)) != 0)
+            traversal3(sv, parentTile * ivec2(8, 4) + ivec2(k & 7, k >> 3));
 }
 
 // Level 1
@@ -261,21 +253,16 @@ void traversal1(ShadowVolume sv, ivec2 parentTile)
     const int level = 1;
     ivec2 tile = parentTile * ivec2(4, 8) + ivec2(gl_ThreadInWarpNV & 3, gl_ThreadInWarpNV >> 2);
     
-    if(!tileInScreen(level, tile))
-        return;
-    
-    float intersects = testSV(sv, level, tile);
+    float intersects = tileInScreen(level, tile) ? testSV(sv, level, tile) : 1.;
     
     if(intersects < 0.)
         updateShadowBuffer(level, tile);
-    else
-    {
-        uint queue = ballotThreadNV(intersects == 0.);
-        
-        for(int k = 0; k < 32; k++)
-            if((queue & (1 << k)) != 0)
-                traversal2(sv, parentTile * ivec2(4, 8) + ivec2(k & 3, k >> 2));
-    }
+    
+    uint queue = ballotThreadNV(intersects == 0.);
+    
+    for(int k = 0; k < 32; k++)
+        if((queue & (1 << k)) != 0)
+            traversal2(sv, parentTile * ivec2(4, 8) + ivec2(k & 3, k >> 2));
 }
 
 // Level 0
@@ -284,20 +271,16 @@ void traversal0(ShadowVolume sv)
     const int level = 0;
     ivec2 tile = ivec2(gl_ThreadInWarpNV & 7, gl_ThreadInWarpNV >> 3);
     
-    if(!tileInScreen(level, tile))
-        return;
+    float intersects = tileInScreen(level, tile) ? testSV(sv, level, tile) : 1.;
     
-    float intersects = testSV(sv, level, tile);
     if(intersects < 0.)
         updateShadowBuffer(level, tile);
-    else
-    {
-        uint queue = ballotThreadNV(intersects == 0.);
-        
-        for(int k = 0; k < 32; k++)
-            if((queue & (1 << k)) != 0)
-                traversal1(sv, ivec2(k & 7, k >> 3));
-    }
+    
+    uint queue = ballotThreadNV(intersects == 0.);
+    
+    for(int k = 0; k < 32; k++)
+        if((queue & (1 << k)) != 0)
+            traversal1(sv, ivec2(k & 7, k >> 3));
 }
 
 void main()
@@ -310,7 +293,7 @@ void main()
     ivec4 cell = cells[cellIndex];
     mat4 objMV = MV[objIndex[cellIndex]];
     vec4 objMVt = MVt[objIndex[cellIndex]];
-    vec4 v[4], center;
+    vec4 v[4], center = vec4(0.);
     for(int k = 0; k < 4; k++)
         center += (v[k] = objMV * vertices[cell[k]] + objMVt);
     center /= 4.;
@@ -327,6 +310,6 @@ void main()
     // Slightly lower the plane to avoid self-shadowing
     sv.planes[4].c = dot(sv.planes[4].n, v[0] - sv.planes[4].n * 0.001);
     
-    // traversal0(sv);
-    updateShadowBuffer(4, ivec2(640, 360));
+    barrier();
+    traversal0(sv);
 }
