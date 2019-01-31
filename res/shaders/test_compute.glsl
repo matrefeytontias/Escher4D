@@ -295,7 +295,10 @@ void main()
     vec4 objMVt = MVt[objIndex[cellIndex]];
     vec4 v[4], center = vec4(0.);
     for(int k = 0; k < 4; k++)
-        center += (v[k] = objMV * vertices[cell[k]] + objMVt);
+    {
+        v[k] = objMV * vertices[cell[k]] + objMVt;
+        center += v[k];
+    }
     center /= 4.;
     // Build shadow volume's planes as looking away from the centroid of the cell
     for(int k = 0; k < 4; ++k)
