@@ -126,6 +126,7 @@ vec2 getDepthsFromBuffer(int level, ivec2 tile)
 // the SV respectively.
 float testSV(ShadowVolume sv, int level, ivec2 tile)
 {
+    // TODO : this is broken somehow
     vec2 tileSize = getClipSpaceTileSize(level);
     vec4 tileMin, tileMax;
     tileMin.xy = vec2(-1.) + tile * tileSize;
@@ -155,7 +156,8 @@ float testSV(ShadowVolume sv, int level, ivec2 tile)
         result += tresult;
         
     }
-    return outside ? 1. : (result == -5 ? -1. : 0.);
+    // return outside ? 1. : (result == -5 ? -1. : 0.);
+    return 0.;
 }
 
 // Tests a view sample against a shadow volume in view space.
@@ -311,9 +313,9 @@ void main()
         sv.planes[k].c = dot(sv.planes[k].n, uLightPos);
     }
     sv.planes[4].n = cross4(v[1] - v[0], v[2] - v[0], v[3] - v[0]);
-    sv.planes[4].n = normalize(sv.planes[4].n * sign(dot(uLightPos - v[0], sv.planes[4].n)));
+    sv.planes[4].n = normalize(sv.planes[4].n * sign(dot(uLightPos - center, sv.planes[4].n)));
     // Slightly lower the plane to avoid self-shadowing
-    sv.planes[4].c = dot(sv.planes[4].n, v[0] - sv.planes[4].n * 0.001);
+    sv.planes[4].c = dot(sv.planes[4].n, v[0] - sv.planes[4].n * 0.01);
     
     barrier();
     traversal0(sv);

@@ -350,8 +350,8 @@ int _main(int, char *argv[])
         timeBase = now;
         
         Vector4f lightPos;
-        // lightPos << sin(now) * 5 + 5, 1.5, 0, 0;
-        lightPos << 0, 1.5, 0, 0;
+        lightPos << sin(now) * 5 + 5, 1.5, 0, 0;
+        // lightPos << 0, 1.5, 0, 0;
         
         program.use();
         
