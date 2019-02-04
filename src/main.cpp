@@ -164,7 +164,7 @@ int _main(int, char *argv[])
             trace("Can't load that shizzle");
             return 0;
         }
-        cubeGeometry.from3D(vertices, tetras);
+        cubeGeometry.from3D(vertices, tris, tetras, 0.1);
         for(unsigned int k = 0; k < cubeGeometry.vertices.size(); k++)
             cubeGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
         cubeGeometry.uploadGPU();
@@ -174,7 +174,7 @@ int _main(int, char *argv[])
             trace("Can't load that shizzle");
             return 0;
         }
-        holedGeometry.from3D(vertices, tetras);
+        holedGeometry.from3D(vertices, tris, tetras, 0.1);
         for(unsigned int k = 0; k < holedGeometry.vertices.size(); k++)
             holedGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
         holedGeometry.uploadGPU();
@@ -350,8 +350,9 @@ int _main(int, char *argv[])
         timeBase = now;
         
         Vector4f lightPos;
+        Transform4 vt = camera.computeViewTransform();
         lightPos << sin(now) * 5 + 5, 1.5, 0, 0;
-        // lightPos << 0, 1.5, 0, 0;
+        lightPos = vt.apply(lightPos);
         
         program.use();
         
@@ -371,20 +372,18 @@ int _main(int, char *argv[])
             unsigned int bleh = 0;
             glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED, GL_UNSIGNED_INT, &bleh);
         }
-        // Compute MV transforms (matrix + translation) for all meshes
+        // Compute M transforms (matrix + translation) for all meshes
         MCompBuffer.clear();
         MtCompBuffer.clear();
         {
-            Transform4 vt = camera.computeViewTransform();
-            // Compute the light's view-space position while we're at it
-            lightPos = vt.apply(lightPos);
-            scene.visit<Transform4>([&](const Object4 &obj, Transform4 &vt)
+            Transform4 dummy;
+            scene.visit<Transform4>([&](const Object4 &obj, Transform4 &pm)
             {
-                Transform4 mv = obj.chain(vt);
-                MCompBuffer.push_back(mv.mat);
-                MtCompBuffer.push_back(mv.pos);
-                return mv;
-            }, vt);
+                Transform4 m = obj.chain(pm);
+                MCompBuffer.push_back(m.mat);
+                MtCompBuffer.push_back(m.pos);
+                return m;
+            }, dummy);
         }
         
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[3]);
@@ -396,6 +395,8 @@ int _main(int, char *argv[])
         glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
         computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
         computeProgram.uniform2i("uTexSize", display_w, display_h);
+        computeProgram.uniformMatrix4fv("V", 1, vt.mat.data());
+        computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
         computeProgram.uniformMatrix4fv("invP", 1, invP.data());
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);

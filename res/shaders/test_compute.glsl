@@ -7,6 +7,10 @@ layout(local_size_x = 32) in;
 // Light position in camera space
 uniform vec4 uLightPos;
 
+// View transform
+uniform mat4 V;
+uniform vec4 Vt;
+
 // Inverse projection matrix
 uniform mat4 invP;
 
@@ -24,13 +28,13 @@ layout(std430, binding = 2) buffer vertexBuffer
 {
     vec4 vertices[];
 };
-layout(std430, binding = 3) buffer MVBuffer
+layout(std430, binding = 3) buffer MBuffer
 {
-    mat4 MV[];
+    mat4 M[];
 };
-layout(std430, binding = 4) buffer MVtBuffer
+layout(std430, binding = 4) buffer MtBuffer
 {
-    vec4 MVt[];
+    vec4 Mt[];
 };
 layout(std430, binding = 5) buffer depthHierarchy
 {
@@ -285,6 +289,13 @@ void traversal0(ShadowVolume sv)
             traversal1(sv, ivec2(k & 7, k >> 3));
 }
 
+void exchange(inout vec4 v1, inout vec4 v2)
+{
+    vec4 temp = v1;
+    v1 = v2;
+    v2 = temp;
+}
+
 void main()
 {
     uint cellIndex = gl_WorkGroupID.x;
@@ -293,15 +304,26 @@ void main()
     ShadowVolume sv;
     // Fetch cell-related data
     ivec4 cell = cells[cellIndex];
-    mat4 objMV = MV[objIndex[cellIndex]];
-    vec4 objMVt = MVt[objIndex[cellIndex]];
+    mat4 objM = M[objIndex[cellIndex]];
+    vec4 objMt = Mt[objIndex[cellIndex]];
     vec4 v[4], center = vec4(0.);
     for(int k = 0; k < 4; k++)
+        v[k] = objM * vertices[cell[k]] + objMt;
+    
+    // Sort the vertices according to some consistent, unique ordering to get rid
+    // of self-shadowing artifacts
+    for(int i = 0; i < 3; ++i)
+        for(int j = i + 1; j < 4; ++j)
+            if(length(v[i]) > length(v[j]))
+                exchange(v[i], v[j]);
+    
+    for(int k = 0; k < 4; k++)
     {
-        v[k] = objMV * vertices[cell[k]] + objMVt;
+        v[k] = V * v[k] + Vt;
         center += v[k];
     }
     center /= 4.;
+        
     // Build shadow volume's planes as looking away from the centroid of the cell
     for(int k = 0; k < 4; ++k)
     {
@@ -312,7 +334,7 @@ void main()
     }
     sv.planes[4].n = cross4(v[1] - v[0], v[2] - v[0], v[3] - v[0]);
     sv.planes[4].n = normalize(sv.planes[4].n * sign(dot(uLightPos - center, sv.planes[4].n)));
-    // Slightly lower the plane to avoid self-shadowing
+    // Slightly lower the plane to avoid further self-shadowing artifacts
     sv.planes[4].c = dot(sv.planes[4].n, v[0] - sv.planes[4].n * 0.01);
     
     barrier();
