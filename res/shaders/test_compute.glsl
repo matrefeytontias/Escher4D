@@ -126,14 +126,13 @@ vec2 getDepthsFromBuffer(int level, ivec2 tile)
 // the SV respectively.
 float testSV(ShadowVolume sv, int level, ivec2 tile)
 {
-    // TODO : this is broken somehow
     vec2 tileSize = getClipSpaceTileSize(level);
     vec4 tileMin, tileMax;
     tileMin.xy = vec2(-1.) + tile * tileSize;
     tileMax.xy = tileMin.xy + tileSize;
     vec2 depths = getDepthsFromBuffer(level, tile);
-    tileMin.z = depths.x;
-    tileMax.z = depths.y;
+    tileMin.z = 2 * depths.x - 1.;
+    tileMax.z = 2 * depths.y - 1.;
     // Go from clip space to view space using homogeneous coordinates
     tileMin.w = tileMax.w = 1;
     tileMin = invP * tileMin;
@@ -156,8 +155,7 @@ float testSV(ShadowVolume sv, int level, ivec2 tile)
         result += tresult;
         
     }
-    // return outside ? 1. : (result == -5 ? -1. : 0.);
-    return 0.;
+    return outside ? 1. : (result == -5 ? -1. : 0.);
 }
 
 // Tests a view sample against a shadow volume in view space.

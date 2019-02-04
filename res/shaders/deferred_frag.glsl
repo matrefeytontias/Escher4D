@@ -117,7 +117,7 @@ void main()
     {
         if(testShadow(k, normCoord))
         {
-            deferredColor = vec4(1., 0., 1., 1.);
+            deferredColor = vec4(0.);
             break;
         }
     }
