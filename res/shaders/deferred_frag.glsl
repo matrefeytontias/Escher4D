@@ -89,7 +89,7 @@ void main()
     else
     {
         // Fetch depth value
-        const float zNear = 1e-4, zFar = 100.;
+        const float zNear = 1e-2, zFar = 40;
         vec2 depth;
         ivec2 bufferCoord = ivec2(normCoord * factors[uDepthLevel]);
         switch(uDepthLevel)

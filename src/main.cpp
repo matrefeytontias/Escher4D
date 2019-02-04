@@ -235,7 +235,7 @@ int _main(int, char *argv[])
             tetrahedra += rc->geometry.cells.size() / 4;
     });
     
-    perspective(p, 90, (float)display_w / display_h, 0.0001, 100);
+    perspective(p, 90, (float)display_w / display_h, 0.01, 40);
     
     trace("Entering drawing loop");
     
