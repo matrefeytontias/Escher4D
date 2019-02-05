@@ -3,7 +3,6 @@
 
 #include <assert.h>
 #include <vector>
-#include <Windows.h>
 
 #include <Eigen/Eigen>
 

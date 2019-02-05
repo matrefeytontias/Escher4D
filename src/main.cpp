@@ -101,7 +101,13 @@ extern "C" {
     /**
      * Tell the Nvidia driver to make itself useful.
      */
-    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+    
+    #ifdef linux
+    __attribute__((visibility("default")))
+    #else
+    __declspec(dllexport)
+    #endif
+     uint64_t NvOptimusEnablement = 0x00000001;
 }
 
 int _main(int, char *argv[])

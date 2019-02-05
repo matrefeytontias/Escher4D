@@ -4,7 +4,7 @@ CC := gcc
 MC := ./tetgen
 MCFLAGS := -pYBNI
 CFLAGS := -Iinclude -c -g -DGLFW_INCLUDE_NONE -Wall -Wextra -Werror -Wno-int-in-bool-context -Wno-misleading-indentation -Wno-shift-negative-value
-CPPFLAGS := -std=c++11
+CPPFLAGS := -std=c++11 -Wno-class-memaccess
 ifeq ($(UNAME_S), Linux)
 	LDFLAGS := -lstdc++ -lm -lglfw
 endif
