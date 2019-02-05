@@ -45,8 +45,8 @@ static void mouseButtonCallback(GLFWwindow *window, int button, int action, int 
 }
 
 // Deferred rendering buffers and textures
-static GLuint gBuffer;
-static Texture *texPos, *texNorm, *texColor, *texDepth;
+static GLuint gBuffer, dBuffer;
+static Texture *texPos, *texNorm, *texColor;
 
 /**
  * Sets up internals (framebuffer and textures) for deferred rendering given
@@ -78,11 +78,10 @@ void setupDeferred(int w, int h)
         GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
     
-    glBindTexture(GL_TEXTURE_2D, texDepth->id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texDepth->id, 0);
+    glBindRenderbuffer(GL_RENDERBUFFER, dBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, dBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -237,8 +236,6 @@ int _main(int, char *argv[])
     
     perspective(p, 90, (float)display_w / display_h, 0.01, 40);
     
-    trace("Entering drawing loop");
-    
     float lightIntensity = 10.f, lightRadius = 20;
     
     float timeBase = glfwGetTime();
@@ -256,6 +253,7 @@ int _main(int, char *argv[])
     texColor = &quadProgram.getTexture("texColor");
     
     glGenFramebuffers(1, &gBuffer);
+    glGenRenderbuffers(1, &dBuffer);
     
     FSQuadRenderContext quadRC(quadProgram);
     
@@ -315,7 +313,7 @@ int _main(int, char *argv[])
     /// Depth hierarchy building
     ShaderProgram depthHierarchyProgram;
     depthHierarchyProgram.attach(GL_COMPUTE_SHADER, "shaders/reduction_compute.glsl");
-    texDepth = &depthHierarchyProgram.getTexture("texDepth");
+    depthHierarchyProgram.registerTexture("texPos", *texPos);
     
     /// Start draw loop
     {
@@ -330,10 +328,7 @@ int _main(int, char *argv[])
     
     glClearColor(0, 0, 0, 1);
     
-    // DEBUG : DEPTH DISPLAY TEST
-    quadProgram.registerTexture("texDepth", *texDepth);
-    bool displayDepth = false, displayDepthMin = true;
-    int depthLevel = 4;
+    trace("Entering drawing loop");
     
     while (!glfwWindowShouldClose(window))
     {
@@ -364,7 +359,7 @@ int _main(int, char *argv[])
         // Generate depth hierarchy
         depthHierarchyProgram.use();
         depthHierarchyProgram.uniform2i("uTexSize", display_w, display_h);
-        glDispatchCompute((display_w + 7) / 8, (display_h  + 3) / 4, 1);
+        // glDispatchCompute((display_w + 7) / 8, (display_h  + 3) / 4, 1);
         
         // Clear shadow hierarchy
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
@@ -399,7 +394,7 @@ int _main(int, char *argv[])
         computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
         computeProgram.uniformMatrix4fv("invP", 1, invP.data());
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
+        // glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
         
         /// Deferred rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -409,9 +404,6 @@ int _main(int, char *argv[])
         quadProgram.uniform1f("uLightIntensity", lightIntensity);
         quadProgram.uniform1f("uLightRadius", lightRadius);
         quadProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
-        quadProgram.uniform1i("uDisplayDepth", displayDepth);
-        quadProgram.uniform1i("uDepthLevel", depthLevel);
-        quadProgram.uniform1i("uMin", displayDepthMin);
         quadProgram.uniform2i("uTexSize", display_w, display_h);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         quadRC.render();
@@ -440,16 +432,6 @@ int _main(int, char *argv[])
             ImGui::Text("Camera position : %lf, %lf, %lf, %lf",
                 camera.pos(0), camera.pos(1), camera.pos(2), camera.pos(3));
             ImGui::Text("Camera rotation : %lf, %lf, %lf", camera._xz, camera._yz, camera._xwzw);
-            ImGui::Separator();
-            ImGui::Checkbox("Display depth hierarchy", &displayDepth);
-            if(displayDepth)
-            {
-                ImGui::SliderInt("Depth hierarchy level", &depthLevel, 0, 4);
-                static int currentItem = 0;
-                ImGui::RadioButton("Min depth", &currentItem, 0); ImGui::SameLine();
-                ImGui::RadioButton("Max depth", &currentItem, 1);
-                displayDepthMin = !currentItem;
-            }
         ImGui::End();
                 
         ImGui::Render();
@@ -459,6 +441,9 @@ int _main(int, char *argv[])
         if(!freezeCamera)
             camera.update(dt);
     }
+    
+    glDeleteRenderbuffers(1, &dBuffer);
+    glDeleteFramebuffers(1, &gBuffer);
     
     glDeleteBuffers(7, compBufferObjs);
     

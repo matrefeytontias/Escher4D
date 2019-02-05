@@ -1,11 +1,11 @@
 #version 430
 
-uniform sampler2D texDepth;
+uniform sampler2D texPos;
 uniform ivec2 uTexSize;
 
 // Each tile holds the min and max depth of the subtiles in the level under it.
 // Each tile holds 32 items and is 8*4 or 4*8 depending on the level. Conceptually,
-// the texDepth texture is level 4.
+// the texPos texture is level 4.
 layout(std430, binding = 5) buffer depthHierarchy
 {
     vec2 level0[8 * 4], // one 8*4 tile
@@ -32,7 +32,7 @@ void reduceGroup(uint tid)
     }
 }
 
-// Parallel reduction of texDepth into depthHierarchy.
+// Parallel reduction of texPos into depthHierarchy.
 // The algorithm fills the levels of the depth hierarchy in a finitely recursive
 // manner to calculate the min/max depth of each tile's subtiles.
 // Each work group's 32 threads process one of the 32 subtiles of each tile.
@@ -53,7 +53,7 @@ void main()
     
     depthFetch[tid] = texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x
         ? vec2(1., 0.)
-        : texelFetch(texDepth, texel, 0).rr;
+        : texelFetch(texPos, texel, 0).rr;
     memoryBarrierShared();
     
     reduceGroup(tid);
