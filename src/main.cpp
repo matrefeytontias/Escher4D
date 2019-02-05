@@ -299,7 +299,7 @@ int _main(int, char *argv[])
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[2]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, vertexCompBuffer.size() * sizeof(Vector4f), &vertexCompBuffer[0](0), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[5]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, HierarchicalBuffer::offsets[4] * 2 * sizeof(float), NULL, GL_DYNAMIC_COPY);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, HierarchicalBuffer::offsets[4] * 8 * sizeof(float), NULL, GL_DYNAMIC_COPY);
     // Shadow hierarchy has 1 bit per pixel but OpenGL needs ints, so divide the size by 32
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, (HierarchicalBuffer::offsets[4] + display_w * display_h) * sizeof(int) / 32, NULL, GL_DYNAMIC_COPY);

@@ -60,7 +60,13 @@ void ShaderProgram::use()
         glLinkProgram(_program);
     glBindVertexArray(_vao);
     if(_currentProgram != _program)
+    {
+        trace("Switching program");
         glUseProgram(_program);
+        trace("Switched");
+    }
+    else
+        trace("Not switching program");
     if(_dirty || _currentProgram != _program)
     {
         int i = 0;
@@ -71,6 +77,7 @@ void ShaderProgram::use()
             glUniform1i(ensureUniform(tex.first), i++);
         }
     }
+    trace("Done");
     _dirty = false;
     _currentProgram = _program;
 }
