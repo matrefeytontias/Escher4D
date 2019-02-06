@@ -91,11 +91,12 @@ static void framebufferSizeCallback(GLFWwindow*, int width, int height)
     setupDeferred(width, height);
 }
 
-static void printGLerror(GLenum, GLenum type, GLuint, GLenum,
+static void printGLerror(GLenum, GLenum type, GLuint, GLenum severity,
     GLsizei, const GLchar *message, const void*)
 {
-    std::cerr << "GL callback : " << (type == GL_DEBUG_TYPE_ERROR ? "error" : "")
-        << " type = 0x" << std::hex << type << std::dec << " : " << message << std::endl;
+    std::cerr << "GL callback :" << (type == GL_DEBUG_TYPE_ERROR ? " error" : "")
+        << " type = 0x" << std::hex << type << "(0x" << severity << ") : " << std::dec
+        << message << std::endl;
 }
 
 // demos.cpp
@@ -131,7 +132,12 @@ int _main(int, char *argv[])
     glfwSwapInterval(0); // no v-sync, live on the edge
     
     glEnable(GL_DEBUG_OUTPUT);
+    glDisable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(printGLerror, NULL);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_HIGH, 0, NULL, GL_TRUE);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_MEDIUM, 0, NULL, GL_TRUE);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW, 0, NULL, GL_FALSE);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
     
     /// Setup ImGui binding
     ImGui::CreateContext();
@@ -299,7 +305,7 @@ int _main(int, char *argv[])
     });
     
     // 0 : cells, 1 : object index, 2 : vertices, 3 : M matrices, 4 : translation
-    // part of M matrices, 5 : depth hierarchy, 6 : shadow hierarchy
+    // part of M matrices, 5 : AABB hierarchy, 6 : shadow hierarchy
     GLuint compBufferObjs[7];
     
     glGenBuffers(7, compBufferObjs);
@@ -310,7 +316,8 @@ int _main(int, char *argv[])
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[2]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, vertexCompBuffer.size() * sizeof(Vector4f), &vertexCompBuffer[0](0), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[5]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, HierarchicalBuffer::offsets[4] * 8 * sizeof(float), NULL, GL_DYNAMIC_COPY);
+    // AABB hierarchy has 4 * 2 floats per pixel
+    glBufferData(GL_SHADER_STORAGE_BUFFER, HierarchicalBuffer::offsets[4] * 4 * 2 * sizeof(float), NULL, GL_DYNAMIC_COPY);
     // Shadow hierarchy has 1 bit per pixel but OpenGL needs ints, so divide the size by 32
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
     glBufferData(GL_SHADER_STORAGE_BUFFER, (HierarchicalBuffer::offsets[4] + display_w * display_h) * sizeof(int) / 32, NULL, GL_DYNAMIC_COPY);
@@ -328,11 +335,13 @@ int _main(int, char *argv[])
     
     /// Start draw loop
     {
-        int mwgcx, mwgcy, mwgcz;
+        int mwgcx, mwgcy, mwgcz, msms;
         glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &mwgcx);
         glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &mwgcy);
         glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &mwgcz);
+        glGetIntegerv(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE, &msms);
         trace("GPU allows for a maximum of (" << mwgcx << ", " << mwgcy << ", " << mwgcz << ") work groups");
+        trace("GPU allows for " << msms << " bytes of shared memory");
     }
     
     setupDeferred(display_w, display_h);
@@ -370,7 +379,7 @@ int _main(int, char *argv[])
         // Generate depth hierarchy
         depthHierarchyProgram.use();
         depthHierarchyProgram.uniform2i("uTexSize", display_w, display_h);
-        // glDispatchCompute((display_w + 7) / 8, (display_h  + 3) / 4, 1);
+        glDispatchCompute((display_w + 7) / 8, (display_h  + 3) / 4, 1);
         
         // Clear shadow hierarchy
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
@@ -405,7 +414,7 @@ int _main(int, char *argv[])
         computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
         computeProgram.uniformMatrix4fv("invP", 1, invP.data());
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        // glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
+        glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
         
         /// Deferred rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);

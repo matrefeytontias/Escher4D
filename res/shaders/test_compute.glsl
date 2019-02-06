@@ -36,12 +36,16 @@ layout(std430, binding = 4) buffer MtBuffer
 {
     vec4 Mt[];
 };
-layout(std430, binding = 5) buffer depthHierarchy
+layout(std430, binding = 5) buffer aabbHierarchy
 {
-    vec2 dlevel0[8 * 4], // one 8*4 tile
-        dlevel1[32 * 32], // 8*4 4*8 tiles
-        dlevel2[256 * 128], // 32*32 8*4 tiles
-        dlevel3[1024 * 1024]; // 256*128 4*8 tiles
+    vec4 minlevel0[8 * 4], // one 8*4 tile
+        minlevel1[32 * 32], // 8*4 4*8 tiles
+        minlevel2[256 * 128], // 32*32 8*4 tiles
+        minlevel3[1024 * 1024]; // 256*128 4*8 tiles
+    vec4 maxlevel0[8 * 4],
+        maxlevel1[32 * 32],
+        maxlevel2[256 * 128],
+        maxlevel3[1024 * 1024];
 };
 // The shadow buffer has 1 bit per pixel, so use uint and use 32 times fewer bytes.
 layout(std430, binding = 6) buffer shadowBuffer
@@ -94,9 +98,7 @@ vec4 cross4(vec4 a, vec4 b, vec4 c)
 
 // GLSL has no recursion, so we have to inline all the 5 levels of the depth
 // buffer hierarchy. Resolutions are 8x4, 32x32, 256x128, 1024x1024, 8192x4096.
-const ivec2 bufferTileSizes[5] = ivec2[5](ivec2(8, 4), ivec2(32, 32), ivec2(256, 128),
-    ivec2(1024, 1024), ivec2(8192, 4096)),
-    fragmentTileSizes[5] = ivec2[5](ivec2(1024, 1024), ivec2(256, 128), ivec2(32, 32),
+const ivec2 fragmentTileSizes[5] = ivec2[5](ivec2(1024, 1024), ivec2(256, 128), ivec2(32, 32),
     ivec2(8, 4), ivec2(1, 1));
 
 bool tileInScreen(int level, ivec2 tile)
@@ -105,23 +107,30 @@ bool tileInScreen(int level, ivec2 tile)
     return extent.x < uTexSize.x && extent.y < uTexSize.y;
 }
 
-vec2 getClipSpaceTileSize(int level)
+void getAABBFromBuffer(int level, ivec2 tile, out vec4 low, out vec4 high)
 {
-    return fragmentTileSizes[level] * 2. / uTexSize;
-}
-
-vec2 getDepthsFromBuffer(int level, ivec2 tile)
-{
+    int offset = tile.x;
     switch(level)
     {
     case 0:
-        return dlevel0[(tile.y << 3) + tile.x];
+        offset += tile.y << 3;
+        low = minlevel0[offset];
+        high = maxlevel0[offset];
+        return;
     case 1:
-        return dlevel1[(tile.y << 5) + tile.x];
+        offset += tile.y << 5;
+        low = minlevel1[offset];
+        high = maxlevel1[offset];
+        return;
     case 2:
-        return dlevel2[(tile.y << 8) + tile.x];
+        offset += tile.y << 8;
+        low = minlevel2[offset];
+        high = maxlevel2[offset];
+        return;
     default:
-        return dlevel3[(tile.y << 10) + tile.x];
+        offset += tile.y << 10;
+        low = minlevel3[offset];
+        high = maxlevel3[offset];
     }
 }
 
@@ -130,25 +139,8 @@ vec2 getDepthsFromBuffer(int level, ivec2 tile)
 // the SV respectively.
 float testSV(ShadowVolume sv, int level, ivec2 tile)
 {
-    vec2 tileSize = getClipSpaceTileSize(level);
     vec4 tileMin, tileMax;
-    tileMin.xy = vec2(-1.) + tile * tileSize;
-    tileMax.xy = tileMin.xy + tileSize;
-    vec2 depths = getDepthsFromBuffer(level, tile);
-    tileMin.z = 2 * depths.x - 1.;
-    tileMax.z = 2 * depths.y - 1.;
-    // Go from clip space to view space using homogeneous coordinates
-    tileMin.w = tileMax.w = 1;
-    tileMin = invP * tileMin;
-    tileMax = invP * tileMax;
-    tileMin /= tileMin.w;
-    tileMax /= tileMax.w;
-    // 4D coordinates
-    tileMin.w = tileMax.w = 0;
-    
-    vec4 temp = min(tileMin, tileMax);
-    tileMax = max(tileMin, tileMax);
-    tileMin = temp;
+    getAABBFromBuffer(level, tile, tileMin, tileMax);
     
     float result = 0.;
     bool outside = false;
@@ -203,8 +195,6 @@ void updateShadowBuffer(int level, ivec2 tile)
 
 // Processes a subtile of the given parentTile. Which subtile
 // is determined by the lane ID.
-
-shared bool subTileIntersects[32];
 
 // Level 4 (final level)
 void traversal4(ShadowVolume sv, ivec2 parentTile)

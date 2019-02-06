@@ -68,16 +68,16 @@ void main()
     
     vec4 deferredColor = min(1, uLightIntensity * falloff) * abs(dot(normal, normalize(lightD))) * color;
     
-    // vec2 normCoord = vTexCoord * uTexSize / vec2(8192., 4096.);
-    //
-    // for(int k = 0; k < 5; k++)
-    // {
-    //     if(testShadow(k, normCoord))
-    //     {
-    //         deferredColor = vec4(0.);
-    //         break;
-    //     }
-    // }
+    vec2 normCoord = vTexCoord * uTexSize / vec2(8192., 4096.);
+    
+    for(int k = 0; k < 5; k++)
+    {
+        if(testShadow(k, normCoord))
+        {
+            deferredColor = vec4(0.);
+            break;
+        }
+    }
     
     fragColor = deferredColor;
 }
