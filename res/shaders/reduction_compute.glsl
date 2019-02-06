@@ -1,38 +1,48 @@
 #version 430
 
-uniform sampler2D texDepth;
+uniform sampler2D texPos;
 uniform ivec2 uTexSize;
 
 // Each tile holds the min and max depth of the subtiles in the level under it.
 // Each tile holds 32 items and is 8*4 or 4*8 depending on the level. Conceptually,
-// the texDepth texture is level 4.
-layout(std430, binding = 5) buffer depthHierarchy
+// the texPos texture is level 4.
+layout(std430, binding = 5) buffer aabbHierarchy
 {
-    vec2 level0[8 * 4], // one 8*4 tile
-        level1[32 * 32], // 8*4 4*8 tiles
-        level2[256 * 128], // 32*32 8*4 tiles
-        level3[1024 * 1024]; // 256*128 4*8 tiles
+    vec4 minlevel0[8 * 4], // one 8*4 tile
+        minlevel1[32 * 32], // 8*4 4*8 tiles
+        minlevel2[256 * 128], // 32*32 8*4 tiles
+        minlevel3[1024 * 1024]; // 256*128 4*8 tiles
+    vec4 maxlevel0[8 * 4],
+        maxlevel1[32 * 32],
+        maxlevel2[256 * 128],
+        maxlevel3[1024 * 1024];
 };
+
+const float POS_INF = 1e5;
+const vec4 dummy = vec4(POS_INF);
 
 layout(local_size_x = 32) in;
 
-shared vec2 depthFetch[32];
+// Every even index holds the min, every odd index holds the max
+shared vec4 aabbFetch[64];
 
 // Parallely reduce 32-item tile into the first cell
 void reduceGroup(uint tid)
 {
-    for(int stride = 16; stride > 0; stride >>= 1)
+    for(int stride = 32; stride > 1; stride >>= 1)
     {
         if(tid < stride)
         {
-            const vec2 d = depthFetch[tid], od = depthFetch[tid + stride];
-            depthFetch[tid] = vec2(min(d.x, od.x), max(d.y, od.y));
+            const vec4 dm = aabbFetch[tid], odm = aabbFetch[tid + stride],
+                dM = aabbFetch[tid + 1], odM = aabbFetch[tid + stride + 1];
+            aabbFetch[tid] = min(dm, odm);
+            aabbFetch[tid + 1] = max(dM, odM);
         }
         memoryBarrierShared();
     }
 }
 
-// Parallel reduction of texDepth into depthHierarchy.
+// Parallel reduction of texPos into aabbHierarchy.
 // The algorithm fills the levels of the depth hierarchy in a finitely recursive
 // manner to calculate the min/max depth of each tile's subtiles.
 // Each work group's 32 threads process one of the 32 subtiles of each tile.
@@ -51,14 +61,26 @@ void main()
     // Tiles are 8x4 in level 4
     ivec2 texel = parentTile * ivec2(8, 4) + ivec2(tid & 7, tid >> 3);
     
-    depthFetch[tid] = texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x
-        ? vec2(1., 0.)
-        : texelFetch(texDepth, texel, 0).rr;
+    if(texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x)
+    {
+        aabbFetch[tid * 2] = dummy;
+        aabbFetch[tid * 2 + 1] = -dummy;
+    }
+    else
+    {
+        vec4 f = texelFetch(texPos, texel, 0);
+        aabbFetch[tid * 2] = f;
+        aabbFetch[tid * 2 + 1] = f;
+    }
     memoryBarrierShared();
     
-    reduceGroup(tid);
+    reduceGroup(tid * 2);
     if(tid == 0)
-        level3[(parentTile.y << 10) + parentTile.x] = depthFetch[0];
+    {
+        int offset = (parentTile.y << 10) + parentTile.x;
+        minlevel3[offset] = aabbFetch[0];
+        maxlevel3[offset] = aabbFetch[1];
+    }
     memoryBarrierBuffer();
     
     // Reduce into level 2, then 1, then 0 in the same way every time
@@ -71,14 +93,26 @@ void main()
     if(parentTile.x >= texSizeLevel.x || parentTile.y >= texSizeLevel.y)
         return;
     texel = parentTile * ivec2(4, 8) + ivec2(tid & 3, tid >> 2);
-    depthFetch[tid] = texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x
-        ? vec2(1., 0.)
-        : level3[(texel.y << 10) + texel.x];
+    if(texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x)
+    {
+        aabbFetch[tid * 2] = dummy;
+        aabbFetch[tid * 2 + 1] = -dummy;
+    }
+    else
+    {
+        int offset = (texel.y << 10) + texel.x;
+        aabbFetch[tid * 2] = minlevel3[offset];
+        aabbFetch[tid * 2 + 1] = maxlevel3[offset];
+    }
     memoryBarrierShared();
     
-    reduceGroup(tid);
+    reduceGroup(tid * 2);
     if(tid == 0)
-        level2[(parentTile.y << 8) + parentTile.x] = depthFetch[0];
+    {
+        int offset = (parentTile.y << 8) + parentTile.x;
+        minlevel2[offset] = aabbFetch[0];
+        maxlevel2[offset] = aabbFetch[1];
+    }
     memoryBarrierBuffer();
     
     // Build level 1 ; level 2 tiles are 8x4
@@ -87,14 +121,26 @@ void main()
     if(parentTile.x >= texSizeLevel.x || parentTile.y >= texSizeLevel.y)
         return;
     texel = parentTile * ivec2(8, 4) + ivec2(tid & 7, tid >> 3);
-    depthFetch[tid] = texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x
-        ? vec2(1., 0.)
-        : level2[(texel.y << 8) + texel.x];
+    if(texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x)
+    {
+        aabbFetch[tid * 2] = dummy;
+        aabbFetch[tid * 2 + 1] = -dummy;
+    }
+    else
+    {
+        int offset = (texel.y << 8) + texel.x;
+        aabbFetch[tid * 2] = minlevel2[offset];
+        aabbFetch[tid * 2 + 1] = maxlevel2[offset];
+    }
     memoryBarrierShared();
     
-    reduceGroup(tid);
+    reduceGroup(tid * 2);
     if(tid == 0)
-        level1[(parentTile.y << 5) + parentTile.x] = depthFetch[0];
+    {
+        int offset = (parentTile.y << 5) + parentTile.x;
+        minlevel1[offset] = aabbFetch[0];
+        maxlevel1[offset] = aabbFetch[1];
+    }
     memoryBarrierBuffer();
     
     // Build level 0 ; level 1 tiles are 4x8
@@ -103,14 +149,26 @@ void main()
     if(parentTile.x >= texSizeLevel.x || parentTile.y >= texSizeLevel.y)
         return;
     texel = parentTile * ivec2(4, 8) + ivec2(tid & 3, tid >> 2);
-    depthFetch[tid] = texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x
-        ? vec2(1., 0.)
-        : level1[(texel.y << 5) + texel.x];
+    if(texel.y >= texSizeNextLevel.y || texel.x >= texSizeNextLevel.x)
+    {
+        aabbFetch[tid * 2] = dummy;
+        aabbFetch[tid * 2 + 1] = -dummy;
+    }
+    else
+    {
+        int offset = (texel.y << 5) + texel.x;
+        aabbFetch[tid * 2] = minlevel1[offset];
+        aabbFetch[tid * 2 + 1] = maxlevel1[offset];
+    }
     memoryBarrierShared();
     
-    reduceGroup(tid);
+    reduceGroup(tid * 2);
     if(tid == 0)
-        level0[(parentTile.y << 3) + parentTile.x] = depthFetch[0];
+    {
+        int offset = (parentTile.y << 3) + parentTile.x;
+        minlevel0[offset] = aabbFetch[0];
+        maxlevel0[offset] = aabbFetch[1];
+    }
     
     // Done !
 }
