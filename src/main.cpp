@@ -91,6 +91,13 @@ static void framebufferSizeCallback(GLFWwindow*, int width, int height)
     setupDeferred(width, height);
 }
 
+static void printGLerror(GLenum, GLenum type, GLuint, GLenum,
+    GLsizei, const GLchar *message, const void*)
+{
+    std::cerr << "GL callback : " << (type == GL_DEBUG_TYPE_ERROR ? "error" : "")
+        << " type = 0x" << std::hex << type << std::dec << " : " << message << std::endl;
+}
+
 // demos.cpp
 void complexDemo(Object4&);
 
@@ -117,10 +124,14 @@ int _main(int, char *argv[])
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
     GLFWwindow *window = glfwCreateWindow(1280, 720, "GLFW Window", NULL, NULL);
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glfwSwapInterval(0); // no v-sync, live on the edge
+    
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(printGLerror, NULL);
     
     /// Setup ImGui binding
     ImGui::CreateContext();
