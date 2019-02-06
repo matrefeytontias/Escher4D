@@ -11,9 +11,6 @@ uniform vec4 uLightPos;
 uniform mat4 V;
 uniform vec4 Vt;
 
-// Inverse projection matrix
-uniform mat4 invP;
-
 uniform ivec2 uTexSize;
 
 layout(std430, binding = 0) buffer cellBuffer
@@ -149,7 +146,6 @@ float testSV(ShadowVolume sv, int level, ivec2 tile)
         float tresult = testHyperplaneAABB(sv.planes[k], tileMin, tileMax);
         outside = outside || tresult > 0;
         result += tresult;
-        
     }
     return outside ? 1. : (result == -5 ? -1. : 0.);
 }

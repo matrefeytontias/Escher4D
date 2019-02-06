@@ -354,7 +354,6 @@ int _main(int, char *argv[])
     {
         glfwGetFramebufferSize(window, &display_w, &display_h);
         setAspectRatio(p, (float)display_w / display_h);
-        Matrix4f invP = p.inverse();
         
         /// Render scene on framebuffer for deferred shading
         glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
@@ -412,7 +411,6 @@ int _main(int, char *argv[])
         computeProgram.uniform2i("uTexSize", display_w, display_h);
         computeProgram.uniformMatrix4fv("V", 1, vt.mat.data());
         computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
-        computeProgram.uniformMatrix4fv("invP", 1, invP.data());
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
         
