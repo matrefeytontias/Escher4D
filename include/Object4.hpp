@@ -46,7 +46,7 @@ struct Object4 : public Transform4
     }
     
     /**
-     * Creates a new object as a children to this object and returns a reference to it.
+     * Creates a new object as a child to this object and returns a reference to it.
      */
     Object4 &addChild()
     {
@@ -54,7 +54,7 @@ struct Object4 : public Transform4
         return *_children.back();
     }
     /**
-     * Adds an object as a children to this object and returns a reference to it.
+     * Adds an object as a child to this object and returns a reference to it.
      */
     Object4 &addChild(Object4 *c)
     {
@@ -62,7 +62,7 @@ struct Object4 : public Transform4
         return *_children.back();
     }
     /**
-     * Adds the copy of an object as a children to this object and returns a reference to it.
+     * Adds the copy of an object as a child to this object and returns a reference to it.
      */
     Object4 &addChild(const Object4 &obj)
     {
@@ -70,7 +70,7 @@ struct Object4 : public Transform4
         return *_children.back();
     }
     /**
-     * Creates an object as a children to this object given a render context and returns a reference to it.
+     * Creates an object as a child to this object given a render context and returns a reference to it.
      */
     Object4 &addChild(Model4RenderContext &rc)
     {
@@ -150,6 +150,7 @@ struct Object4 : public Transform4
     Vector4f color;
     
     bool castShadows = true;
+    bool insideOut = false;
     
 protected:
     Object4() : Transform4() { }
@@ -172,6 +173,7 @@ protected:
             _rc->_program.uniformMatrix4fv("tinvMV", 1, &tinvmv.data()[0]);
             _rc->_program.uniform4f("MVt", mv.pos(0), mv.pos(1), mv.pos(2), mv.pos(3));
             _rc->_program.uniform4f("uColor", color(0), color(1), color(2), color(3));
+            _rc->_program.uniform1i("uInsideOut", insideOut);
             _rc->render();
         }
         
