@@ -204,11 +204,11 @@ int _main(int, char *argv[])
     Model4RenderContext cubeRC(cubeGeometry, program), holedRC(holedGeometry, program);
     
     // Build the complex
-    Object4 &scene = Object4::scene;
+    Object4 &complex = Object4::scene.addChild();
     {
         // Build a single room
         // 3 cells have a hole in them, respectively in the directions +X, +Z and +W
-        Object4 &room1 = scene.addChild();
+        Object4 &room1 = complex.addChild();
         for(unsigned int k = 0; k < 5; k++)
         {
             room1.addChild(cubeRC);
@@ -246,11 +246,16 @@ int _main(int, char *argv[])
         room1[4].rotate(XW, M_PI); // 180° rotation, any axis + W
     }
     
-    complexDemo(scene);
+    complexDemo(complex);
+    
+    Object4 &cube = Object4::scene.addChild(cubeRC);
+    cube.scale(Vector4f(0.5, 0.5, 0.5, 5)).pos << 0, 2, 5, 0;
+    cube.color << 1, 1, 1, 1;
+    cube.insideOut = true;
     
     // Print amount of tetrahedra for fun
     int tetrahedra = 0;
-    scene.visit([&tetrahedra](const Object4 &obj)
+    Object4::scene.visit([&tetrahedra](const Object4 &obj)
     {
         const Model4RenderContext *rc = obj.getRenderContext();
         if(rc)
@@ -265,7 +270,7 @@ int _main(int, char *argv[])
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
-    scene.scale(Vector4f(10, 6, 10, 10)).pos(1) = 3;
+    complex.scale(Vector4f(10, 6, 10, 10)).pos(1) = 3;
     
     /// Setup deferred shading
     ShaderProgram quadProgram;
@@ -289,7 +294,7 @@ int _main(int, char *argv[])
     std::vector<Vector4f> MtCompBuffer; // vec4
     
     int objectIndex = 0;
-    scene.visit([&](const Object4 &obj)
+    Object4::scene.visit([&](const Object4 &obj)
     {
         if(obj.castShadows)
         {
@@ -371,19 +376,20 @@ int _main(int, char *argv[])
         
         Vector4f lightPos;
         Transform4 vt = camera.computeViewTransform();
-        lightPos << sin(now) * 5 + 5, 1.5, 0, 0;
+        lightPos << sin(now) * 2, sin(now * 1.5) * 1.5 + 2, 0, cos(now) * 2;
         lightPos = vt.apply(lightPos);
         
         program.use();
         
         program.uniformMatrix4fv("P", 1, &p.data()[0]);
         
-        scene.render(camera);
+        Object4::scene.render(camera);
         
         /// GPGPU fun
         // Generate depth hierarchy
         depthHierarchyProgram.use();
         depthHierarchyProgram.uniform2i("uTexSize", display_w, display_h);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
         glDispatchCompute((display_w + 7) / 8, (display_h  + 3) / 4, 1);
         
         // Clear shadow hierarchy
@@ -397,7 +403,7 @@ int _main(int, char *argv[])
         MtCompBuffer.clear();
         {
             Transform4 dummy;
-            scene.visit<Transform4>([&](const Object4 &obj, Transform4 &pm)
+            Object4::scene.visit<Transform4>([&](const Object4 &obj, Transform4 &pm)
             {
                 Transform4 m = obj.chain(pm);
                 MCompBuffer.push_back(m.mat);
