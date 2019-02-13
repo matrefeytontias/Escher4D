@@ -190,8 +190,6 @@ int _main(int, char *argv[])
         cubeGeometry.from3D(vertices, tris, tetras, 0.1);
         cubeGeometry.unindex();
         cubeGeometry.recomputeNormals(true);
-        // for(unsigned int k = 0; k < cubeGeometry.vertices.size(); k++)
-        //     cubeGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
         cubeGeometry.uploadGPU();
         // Holed cube
         if(!OFFLoader::loadModel("models/holedCube", vertices, tris, tetras))
@@ -202,8 +200,6 @@ int _main(int, char *argv[])
         holedGeometry.from3D(vertices, tris, tetras, 0.1);
         holedGeometry.unindex();
         holedGeometry.recomputeNormals(true);
-        // for(unsigned int k = 0; k < holedGeometry.vertices.size(); k++)
-        //     holedGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
         holedGeometry.uploadGPU();
     }
     Model4RenderContext cubeRC(cubeGeometry, program), holedRC(holedGeometry, program);
