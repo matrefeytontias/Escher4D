@@ -170,10 +170,10 @@ struct Geometry4
     /**
      * Computes the bounding box of the geometry.
      */
-    void boundingBox(Vector4f &min, Vector4f &max)
+    void boundingBox(Vector4f &min, Vector4f &max) const
     {
         min = max = vertices[0];
-        for(Vector4f &v : vertices)
+        for(const Vector4f &v : vertices)
         {
             min = v.array().min(min.array()).matrix();
             max = v.array().max(max.array()).matrix();
@@ -239,7 +239,7 @@ struct Geometry4
     /**
      * Tells whether the geometry is indexed or has vertex duplication.
      */
-    bool isIndexed() { return cells.size() > 0; }
+    bool isIndexed() const { return cells.size() > 0; }
     
     /**
      * Vertices of the geomtry.

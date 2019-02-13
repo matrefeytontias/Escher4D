@@ -188,8 +188,10 @@ int _main(int, char *argv[])
             return 0;
         }
         cubeGeometry.from3D(vertices, tris, tetras, 0.1);
-        for(unsigned int k = 0; k < cubeGeometry.vertices.size(); k++)
-            cubeGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
+        cubeGeometry.unindex();
+        cubeGeometry.recomputeNormals(true);
+        // for(unsigned int k = 0; k < cubeGeometry.vertices.size(); k++)
+        //     cubeGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
         cubeGeometry.uploadGPU();
         // Holed cube
         if(!OFFLoader::loadModel("models/holedCube", vertices, tris, tetras))
@@ -198,8 +200,10 @@ int _main(int, char *argv[])
             return 0;
         }
         holedGeometry.from3D(vertices, tris, tetras, 0.1);
-        for(unsigned int k = 0; k < holedGeometry.vertices.size(); k++)
-            holedGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
+        holedGeometry.unindex();
+        holedGeometry.recomputeNormals(true);
+        // for(unsigned int k = 0; k < holedGeometry.vertices.size(); k++)
+        //     holedGeometry.normals.push_back(Vector4f(0, 0, 0, -1));
         holedGeometry.uploadGPU();
     }
     Model4RenderContext cubeRC(cubeGeometry, program), holedRC(holedGeometry, program);
@@ -301,15 +305,27 @@ int _main(int, char *argv[])
         if(obj.castShadows)
         {
             const Model4RenderContext *rc = obj.getRenderContext();
-            if(rc && rc->geometry.isIndexed())
+            if(rc)
             {
                 const Geometry4 &geom = rc->geometry;
                 const int vertexCount = vertexCompBuffer.size();
-                for(unsigned int k = 0; k < geom.cells.size(); k++)
+                if(geom.isIndexed())
                 {
-                    cellsCompBuffer.push_back(geom.cells[k] + vertexCount);
-                    if(!(k % 4))
-                        objIndexCompBuffer.push_back(objectIndex);
+                    for(unsigned int k = 0; k < geom.cells.size(); k++)
+                    {
+                        cellsCompBuffer.push_back(geom.cells[k] + vertexCount);
+                        if(!(k % 4))
+                            objIndexCompBuffer.push_back(objectIndex);
+                    }
+                }
+                else
+                {
+                    for(unsigned int k = 0; k < geom.vertices.size(); k++)
+                    {
+                        cellsCompBuffer.push_back(k + vertexCount);
+                        if(!(k % 4))
+                            objIndexCompBuffer.push_back(objectIndex);
+                    }
                 }
                 vertexCompBuffer.insert(vertexCompBuffer.end(), geom.vertices.begin(), geom.vertices.end());
             }
