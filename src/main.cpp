@@ -21,6 +21,7 @@
 #include "OFFLoader.hpp"
 #include "Object4.hpp"
 #include "ShaderProgram.hpp"
+#include "ShadowHypervolumes.hpp"
 #include "utils.hpp"
 
 static void glfw_error_callback(int error, const char *description)
@@ -285,8 +286,9 @@ int _main(int, char *argv[])
     
     FSQuadRenderContext quadRC(quadProgram);
     
-    /// Setup compute kernel and related
-    /// Shadow hypervolume intersections
+    /// Setup shadow hypervolumes computations
+    ShadowHypervolumes svComputer;
+    
     std::vector<int> cellsCompBuffer; // ivec4
     std::vector<int> objIndexCompBuffer; // int
     std::vector<Vector4f> vertexCompBuffer; // vec4
@@ -315,34 +317,7 @@ int _main(int, char *argv[])
         objectIndex++;
     });
     
-    // 0 : cells, 1 : object index, 2 : vertices, 3 : M matrices, 4 : translation
-    // part of M matrices, 5 : AABB hierarchy, 6 : shadow hierarchy
-    GLuint compBufferObjs[7];
-    
-    glGenBuffers(7, compBufferObjs);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[0]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, cellsCompBuffer.size() * sizeof(int), &cellsCompBuffer[0], GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[1]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, objIndexCompBuffer.size() * sizeof(int), &objIndexCompBuffer[0], GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[2]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, vertexCompBuffer.size() * sizeof(Vector4f), &vertexCompBuffer[0](0), GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[5]);
-    // AABB hierarchy has 4 * 2 floats per pixel
-    glBufferData(GL_SHADER_STORAGE_BUFFER, HierarchicalBuffer::offsets[4] * 4 * 2 * sizeof(float), NULL, GL_DYNAMIC_COPY);
-    // Shadow hierarchy has 1 bit per pixel but OpenGL needs ints, so divide the size by 32
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, (HierarchicalBuffer::offsets[4] + display_w * display_h) * sizeof(int) / 32, NULL, GL_DYNAMIC_COPY);
-    
-    for(unsigned int k = 0; k < 7; k++)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, k, compBufferObjs[k]);
-    
-    ShaderProgram computeProgram;
-    computeProgram.attach(GL_COMPUTE_SHADER, "shaders/test_compute.glsl");
-    
-    /// Depth hierarchy building
-    ShaderProgram depthHierarchyProgram;
-    depthHierarchyProgram.attach(GL_COMPUTE_SHADER, "shaders/reduction_compute.glsl");
-    depthHierarchyProgram.registerTexture("texPos", *texPos);
+    svComputer.reinit(display_w, display_h, *texPos, cellsCompBuffer, objIndexCompBuffer, vertexCompBuffer);
     
     /// Start draw loop
     {
@@ -386,18 +361,9 @@ int _main(int, char *argv[])
         Object4::scene.render(camera);
         
         /// GPGPU fun
-        // Generate depth hierarchy
-        depthHierarchyProgram.use();
-        depthHierarchyProgram.uniform2i("uTexSize", display_w, display_h);
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-        glDispatchCompute((display_w + 7) / 8, (display_h  + 3) / 4, 1);
+        // Generate AABB hierarchy and bind test program
+        ShaderProgram &computeProgram = svComputer.precompute();
         
-        // Clear shadow hierarchy
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[6]);
-        {
-            unsigned int bleh = 0;
-            glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED, GL_UNSIGNED_INT, &bleh);
-        }
         // Compute M transforms (matrix + translation) for all meshes
         MCompBuffer.clear();
         MtCompBuffer.clear();
@@ -412,19 +378,14 @@ int _main(int, char *argv[])
             }, dummy);
         }
         
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[3]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, MCompBuffer.size() * sizeof(Matrix4f), MCompBuffer[0].data(), GL_STREAM_DRAW);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, compBufferObjs[4]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, MtCompBuffer.size() * sizeof(Vector4f), &MtCompBuffer[0](0), GL_STREAM_DRAW);
         // Bind textures and whatnot
-        computeProgram.use();
         glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
         computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
         computeProgram.uniform2i("uTexSize", display_w, display_h);
         computeProgram.uniformMatrix4fv("V", 1, vt.mat.data());
         computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        glDispatchCompute(cellsCompBuffer.size() / 4, 1, 1);
+        // Perform the actual computation
+        svComputer.compute(MCompBuffer, MtCompBuffer);
         
         /// Deferred rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -474,8 +435,6 @@ int _main(int, char *argv[])
     
     glDeleteRenderbuffers(1, &dBuffer);
     glDeleteFramebuffers(1, &gBuffer);
-    
-    glDeleteBuffers(7, compBufferObjs);
     
     trace("Exiting drawing loop");
     // Cleanup
