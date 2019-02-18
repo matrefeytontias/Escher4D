@@ -58,7 +58,7 @@ void setupDeferred(int w, int h)
     glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
     
     glBindTexture(GL_TEXTURE_2D, texPos->id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texPos->id, 0);
@@ -209,6 +209,10 @@ int _main(int, char *argv[])
             return 0;
         }
         stoolGeometry.from3D(vertices, tris, tetras, 6.);
+        Vector4f barycenter = stoolGeometry.barycenter();
+        for(Vector4f &v : stoolGeometry.vertices)
+            v -= barycenter;
+        stoolGeometry.unindex();
         stoolGeometry.recomputeNormals();
         stoolGeometry.uploadGPU();
     }
@@ -261,7 +265,8 @@ int _main(int, char *argv[])
     complexDemo(complex);
     
     Object4 &stool = Object4::scene.addChild(stoolRC);
-    stool.rotate(YZ, M_PI / 2).scale(Vector4f(0.075, 0.075, 0.075, 0.075)).pos << 0, 1, -4, 0;
+    stool.castShadows = false;
+    stool.rotate(YZ, M_PI / 2).scale(0.075).pos << 0, 0.7, -4, 0;
     stool.color << 1, 1, 1, 1;
     
     // Print amount of tetrahedra for fun
@@ -407,7 +412,7 @@ int _main(int, char *argv[])
         }
         
         // Bind textures and whatnot
-        glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+        glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         computeProgram.uniform2i("uTexSize", display_w, display_h);
         computeProgram.uniformMatrix4fv("V", 1, vt.mat.data());
         computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));

@@ -54,7 +54,7 @@ layout(std430, binding = 6) buffer shadowBuffer
         slevel4[];
 };
 
-layout(rgba16f, binding = 0) restrict readonly uniform image2D texPos;
+layout(rgba32f, binding = 0) restrict readonly uniform image2D texPos;
 
 struct Plane
 {
