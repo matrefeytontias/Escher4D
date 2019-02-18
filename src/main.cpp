@@ -177,7 +177,7 @@ int _main(int, char *argv[])
     program.attach(GL_FRAGMENT_SHADER, "shaders/fragment.glsl");
     
     // Load geometry
-    Geometry4 cubeGeometry, holedGeometry;
+    Geometry4 cubeGeometry, holedGeometry, stoolGeometry;
     {
         std::vector<Eigen::Vector3f> vertices;
         std::vector<unsigned int> tris, tetras;
@@ -201,8 +201,19 @@ int _main(int, char *argv[])
         holedGeometry.unindex();
         holedGeometry.recomputeNormals(true);
         holedGeometry.uploadGPU();
+        
+        // Stool 3D model
+        if(!OFFLoader::loadModel("models/stool", vertices, tris, tetras))
+        {
+            trace("No stool for you");
+            return 0;
+        }
+        stoolGeometry.from3D(vertices, tris, tetras, 6.);
+        stoolGeometry.recomputeNormals();
+        stoolGeometry.uploadGPU();
     }
-    Model4RenderContext cubeRC(cubeGeometry, program), holedRC(holedGeometry, program);
+    Model4RenderContext cubeRC(cubeGeometry, program), holedRC(holedGeometry, program),
+        stoolRC(stoolGeometry, program);
     
     // Build the complex
     Object4 &complex = Object4::scene.addChild();
@@ -249,10 +260,9 @@ int _main(int, char *argv[])
     
     complexDemo(complex);
     
-    Object4 &cube = Object4::scene.addChild(cubeRC);
-    cube.scale(Vector4f(0.5, 0.5, 0.5, 5)).pos << 0, 2, 5, 0;
-    cube.color << 1, 1, 1, 1;
-    cube.insideOut = true;
+    Object4 &stool = Object4::scene.addChild(stoolRC);
+    stool.rotate(YZ, M_PI / 2).scale(Vector4f(0.075, 0.075, 0.075, 0.075)).pos << 0, 1, -4, 0;
+    stool.color << 1, 1, 1, 1;
     
     // Print amount of tetrahedra for fun
     int tetrahedra = 0;
@@ -260,7 +270,12 @@ int _main(int, char *argv[])
     {
         const Model4RenderContext *rc = obj.getRenderContext();
         if(rc)
-            tetrahedra += rc->geometry.cells.size() / 4;
+        {
+            if(rc->geometry.isIndexed())
+                tetrahedra += rc->geometry.cells.size() / 4;
+            else
+                tetrahedra += rc->geometry.vertices.size() / 4;
+        }
     });
     
     perspective(p, 90, (float)display_w / display_h, 0.01, 40);
@@ -365,6 +380,7 @@ int _main(int, char *argv[])
         Transform4 vt = camera.computeViewTransform();
         lightPos << sin(now) * 2, sin(now * 1.5) * 1.5 + 2, 0, cos(now) * 2;
         lightPos = vt.apply(lightPos);
+        // lightPos << 0.5, 0, 0.5, 0;
         
         program.use();
         
@@ -392,11 +408,11 @@ int _main(int, char *argv[])
         
         // Bind textures and whatnot
         glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-        computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
         computeProgram.uniform2i("uTexSize", display_w, display_h);
         computeProgram.uniformMatrix4fv("V", 1, vt.mat.data());
         computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
         // Perform the actual computation
+        computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
         svComputer.compute(MCompBuffer, MtCompBuffer);
         
         /// Deferred rendering

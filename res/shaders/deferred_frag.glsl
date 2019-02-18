@@ -70,14 +70,14 @@ void main()
     
     vec2 normCoord = vTexCoord * uTexSize / vec2(8192., 4096.);
     
-    for(int k = 0; k < 5; k++)
-    {
-        if(testShadow(k, normCoord))
-        {
-            deferredColor = vec4(0.);
-            break;
-        }
-    }
+    // for(int k = 0; k < 5; k++)
+    // {
+    //     if(testShadow(k, normCoord))
+    //     {
+    //         deferredColor = vec4(0.);
+    //         break;
+    //     }
+    // }
     
     fragColor = deferredColor;
 }
