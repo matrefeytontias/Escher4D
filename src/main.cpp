@@ -136,7 +136,7 @@ int _main(int, char *argv[])
     GLFWwindow *window = glfwCreateWindow(1280, 720, "GLFW Window", NULL, NULL);
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-    glfwSwapInterval(0); // no v-sync, live on the edge
+    glfwSwapInterval(1); // no v-sync, live on the edge
     
     glEnable(GL_DEBUG_OUTPUT);
     glDisable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
@@ -265,8 +265,8 @@ int _main(int, char *argv[])
     complexDemo(complex);
     
     Object4 &stool = Object4::scene.addChild(stoolRC);
-    stool.castShadows = false;
-    stool.rotate(YZ, M_PI / 2).scale(0.075).pos << 0, 0.7, -4, 0;
+    // stool.castShadows = false;
+    stool.rotate(YZ, M_PI / 2).scale(0.25).pos << 0, 1.5, 0, 0;
     stool.color << 1, 1, 1, 1;
     
     // Print amount of tetrahedra for fun
