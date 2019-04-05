@@ -260,7 +260,10 @@ int _main(int, char *argv[])
     {
         const Model4RenderContext *rc = obj.getRenderContext();
         if(rc)
-            tetrahedra += rc->geometry.cells.size() / 4;
+        {
+            tetrahedra += rc->geometry.isIndexed() ? rc->geometry.cells.size() / 4
+                : rc->geometry.vertices.size() / 4;
+        }
     });
     
     perspective(p, 90, (float)display_w / display_h, 0.01, 40);

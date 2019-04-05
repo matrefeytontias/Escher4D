@@ -44,7 +44,7 @@ struct Camera4 : private Transform4
         _xz += (mouseX - _prevMouseX) / rotationDivisorX;
         _yz += (mouseY - _prevMouseY) / rotationDivisorY;
         // Cap _yz rotation at head and feet
-        _yz = clamp(_yz, -(float)M_PI / 2, (float)M_PI / 2);
+        _yz = clamp(_yz, -(float)M_PI / 2 + 0.01f, (float)M_PI / 2 - 0.01f);
         
         Vector4f dir = Vector4f(-sin(_xz) * cos(_yz), sin(_yz), cos(_xz) * cos(_yz), 0);
         lookAt(dir, Vector4f(0, 1, 0, 0), Vector4f(0, 0, 0, 1));
