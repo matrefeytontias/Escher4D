@@ -1,4 +1,6 @@
+.vscode/
 bin/
+build/
 deps/
 obj/
 *.face

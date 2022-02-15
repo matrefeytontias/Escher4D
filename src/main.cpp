@@ -10,9 +10,10 @@
 #include <string>
 
 #include "imgui.h"
-#include "imgui_impl_glfw_gl3.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 #include <Eigen/Eigen>
-// #include <glad/glad.h>
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include "Camera4.hpp"
@@ -110,18 +111,16 @@ extern "C" {
      * Tell the Nvidia driver to make itself useful.
      */
     
-    #ifdef linux
-    __attribute__((visibility("default")))
-    #else
+    #ifdef _MSC_VER
     __declspec(dllexport)
+    #else
+    __attribute__((visibility("default")))
     #endif
-     uint64_t NvOptimusEnablement = 0x00000001;
+    uint64_t NvOptimusEnablement = 0x00000001;
 }
 
 int _main(int, char *argv[])
 {
-    setwd(argv);
-    
     /// Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -151,7 +150,8 @@ int _main(int, char *argv[])
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
-    ImGui_ImplGlfwGL3_Init(window, true);
+    ImGui_ImplOpenGL3_Init("#version 450");
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
     glfwSetKeyCallback(window, keyCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
@@ -414,7 +414,9 @@ int _main(int, char *argv[])
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         quadRC.render();
         
-        ImGui_ImplGlfwGL3_NewFrame();
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
         
         ImGui::Begin("Test parameters", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             if(ImGui::TreeNode("Lighting parameters"))
@@ -441,7 +443,7 @@ int _main(int, char *argv[])
         ImGui::End();
                 
         ImGui::Render();
-        ImGui_ImplGlfwGL3_RenderDrawData(ImGui::GetDrawData());
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
         glfwPollEvents();
         if(!freezeCamera)
@@ -453,7 +455,8 @@ int _main(int, char *argv[])
     
     trace("Exiting drawing loop");
     // Cleanup
-    ImGui_ImplGlfwGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplOpenGL3_Shutdown();
     ImGui::DestroyContext();
     glfwTerminate();
     

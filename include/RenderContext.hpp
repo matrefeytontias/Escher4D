@@ -9,7 +9,7 @@ public:
     RenderContext(ShaderProgram &program) : _program(program) { }
     virtual void render() = 0;
 protected:
-    friend class Object4;
+    friend struct Object4;
     ShaderProgram &_program;
 };
 

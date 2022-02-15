@@ -2,6 +2,7 @@
 #define INC_CAMERA4
 
 #include <Eigen/Eigen>
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include "Transform4.hpp"

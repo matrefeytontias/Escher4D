@@ -7,13 +7,21 @@
 #include <iterator>
 #include <stdexcept>
 #include <string>
+
+#ifdef _WIN32
+#include <direct.h>
+#undef near
+#undef far
+#define chdir _chdir
+#else
 #include <unistd.h>
+#endif
 
 #include <Eigen/Eigen>
 
 void setwd(char **argv)
 {
-    char *buf = new char[strlen(argv[0])];
+    char *buf = new char[strlen(argv[0]) + 1];
     strcpy(buf, argv[0]);
     // Handle both possible separators
     char *p = strrchr(buf, '/');

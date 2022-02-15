@@ -9,6 +9,8 @@
 #include <Eigen/Eigen>
 #include <glad/glad.h>
 
+#define M_PI 3.1415926535897932384626433832795f
+
 /**
  * Sets the working directory.
  * @param   argv    the program's argv, retrieved through the main function
