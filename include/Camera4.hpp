@@ -1,13 +1,11 @@
 #ifndef INC_CAMERA4
 #define INC_CAMERA4
 
-#include <Eigen/Eigen>
+#include <Empty/math/mat.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include "Transform4.hpp"
-
-using namespace Eigen;
 
 struct Camera4 : private Transform4
 {
@@ -20,8 +18,12 @@ struct Camera4 : private Transform4
      */
     Transform4 computeViewTransform() const
     {
-        Matrix4f m = mat.inverse();
-        return Transform4(m, -(m * pos));
+        // TODO
+        // math::mat4 m = mat.inverse();
+        math::mat4 m = mat;
+        // TODO
+        // return Transform4(m, -(m * pos));
+        return Transform4(m, pos);
     }
     /**
      * Processes input for camera movement.
@@ -30,9 +32,9 @@ struct Camera4 : private Transform4
     void update(float dt)
     {
         // Movement
-        Vector4f dr(glfwGetKey(_window, GLFW_KEY_D) - glfwGetKey(_window, GLFW_KEY_A),
+        math::vec4 dr(glfwGetKey(_window, GLFW_KEY_D) - glfwGetKey(_window, GLFW_KEY_A),
             0, glfwGetKey(_window, GLFW_KEY_S) - glfwGetKey(_window, GLFW_KEY_W), 0);
-        dr.normalize();
+        dr = math::normalize(dr);
         dr *= speed * dt;
         
         dr = mat * dr;
@@ -47,8 +49,8 @@ struct Camera4 : private Transform4
         // Cap _yz rotation at head and feet
         _yz = clamp(_yz, -(float)M_PI / 2 + 0.01f, (float)M_PI / 2 - 0.01f);
         
-        Vector4f dir = Vector4f(-sin(_xz) * cos(_yz), sin(_yz), cos(_xz) * cos(_yz), 0);
-        lookAt(dir, Vector4f(0, 1, 0, 0), Vector4f(0, 0, 0, 1));
+        math::vec4 dir = math::vec4(-sin(_xz) * cos(_yz), sin(_yz), cos(_xz) * cos(_yz), 0.f);
+        lookAt(dir, math::vec4(0, 1, 0, 0), math::vec4(0, 0, 0, 1));
         _prevMouseX = mouseX; _prevMouseY = mouseY;
         
         // XW + ZW rotation

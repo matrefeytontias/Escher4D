@@ -4,13 +4,11 @@
 #include <assert.h>
 #include <vector>
 
-#include <Eigen/Eigen>
+#include <Empty/math/mat.h>
 
 #include "MathUtil.hpp"
 #include "Rotor4.hpp"
 #include "utils.hpp"
-
-using namespace Eigen;
 
 enum Planes4
 {
@@ -24,13 +22,13 @@ enum Planes4
 
 struct Transform4
 {
-    Transform4() { mat = Matrix4f::Identity(); pos = Vector4f::Zero(); }
-    Transform4(const Matrix4f &m, const Vector4f &t) : mat(m), pos(t) { }
+    Transform4() { mat = math::mat4::Identity(); pos = math::vec4(0, 0, 0, 0); }
+    Transform4(const math::mat4 &m, const math::vec4 &t) : mat(m), pos(t) { }
     
     /**
      * Applies this transform to a vector.
      */
-    Vector4f apply(const Vector4f &v) const
+    math::vec4 apply(const math::vec4 &v) const
     {
         return mat * v + pos;
     }
@@ -48,9 +46,9 @@ struct Transform4
      * Appends a scaling to the current transform.
      * @param
      */
-    Transform4 &scale(const Vector4f &factor)
+    Transform4 &scale(const math::vec4 &factor)
     {
-        Matrix4f s = Matrix4f::Identity();
+        math::mat4 s = math::mat4::Identity();
         for(int k = 0; k < 4; ++k)
             s(k, k) = factor(k);
         mat = s * mat;
@@ -59,7 +57,8 @@ struct Transform4
     
     Transform4 &scale(float factor)
     {
-        mat *= factor;
+        // TODO
+        mat = mat * factor;
         return *this;
     }
     
@@ -70,7 +69,7 @@ struct Transform4
      */
     Transform4 &rotate(Planes4 p, float angle)
     {
-        Matrix4f r = Matrix4f::Identity();
+        math::mat4 r = math::mat4::Identity();
         int i = p >> 4, j = p & 0xf;
         float c = cos(angle), s = sin(angle);
         r(i, i) = r(j, j) = c;
@@ -88,13 +87,13 @@ struct Transform4
      * @param   up      the up vector defining the hyperplane to look in. Should be normalized
      * @param   duth    the duth vector (w) normal to the hyperplane to look in. Should be normalized
      */
-    Transform4 &lookAt(const Vector4f &at, const Vector4f &up, const Vector4f &duth)
+    Transform4 &lookAt(const math::vec4 &at, const math::vec4 &up, const math::vec4 &duth)
     {
-        Matrix4f r;
-        r.block<4, 1>(0, 2) = at;
-        r.block<4, 1>(0, 0) = MathUtil::cross4(up, at, duth).normalized();
-        r.block<4, 1>(0, 1) = MathUtil::cross4(at, duth, r.block<4, 1>(0, 0)).normalized();
-        r.block<4, 1>(0, 3) = MathUtil::cross4(r.block<4, 1>(0, 0), r.block<4, 1>(0, 1), at).normalized();
+        math::mat4 r;
+        r.column(2) = at;
+        r.column(0) = math::normalize(MathUtil::cross4(up, at, duth));
+        r.column(1) = math::normalize(MathUtil::cross4(at, duth, r.column(0)));
+        r.column(3) = math::normalize(MathUtil::cross4(r.column(0), r.column(1), at));
         
         mat = r;
         return *this;
@@ -103,12 +102,12 @@ struct Transform4
     /**
      * Linear component of the transform.
      */
-    Matrix4f mat;
+    math::mat4 mat;
     // Rotor4 mat;
     /**
      * Translation component of the transform.
      */
-    Vector4f pos;
+    math::vec4 pos;
 };
 
 #endif

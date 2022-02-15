@@ -4,27 +4,31 @@
 #include <iterator>
 #include <vector>
 
-#include <Eigen/Eigen>
+#include <Empty/math/vec.h>
+#include <Empty/math/funcs.h>
 
-using namespace Eigen;
+using namespace math;
 
-Vector4f MathUtil::cross4(const Vector4f &v1, const Vector4f &v2, const Vector4f &v3)
+vec4 MathUtil::cross4(const vec4 &v1, const vec4 &v2, const vec4 &v3)
 {
-    static auto xyz = [](const Vector4f &v) { return Vector3f(v(0), v(1), v(2)); };
-    static auto xyw = [](const Vector4f &v) { return Vector3f(v(0), v(1), v(3)); };
-    static auto xzw = [](const Vector4f &v) { return Vector3f(v(0), v(2), v(3)); };
-    static auto yzw = [](const Vector4f &v) { return Vector3f(v(1), v(2), v(3)); };
+    static auto xyz = [](const vec4 &v) { return vec3(v(0), v(1), v(2)); };
+    static auto xyw = [](const vec4 &v) { return vec3(v(0), v(1), v(3)); };
+    static auto xzw = [](const vec4 &v) { return vec3(v(0), v(2), v(3)); };
+    static auto yzw = [](const vec4 &v) { return vec3(v(1), v(2), v(3)); };
     
-    Vector4f v;
-    v(0) = yzw(v3).dot(yzw(v1).cross(yzw(v2)));
-    v(1) = -xzw(v3).dot(xzw(v1).cross(xzw(v2)));
-    v(2) = xyw(v3).dot(xyw(v1).cross(xyw(v2)));
-    v(3) = -xyz(v3).dot(xyz(v1).cross(xyz(v2)));
+    vec4 v;
+    v(0) = dot(yzw(v3), cross(yzw(v1), yzw(v2)));
+    v(1) = -dot(xzw(v3), cross(xzw(v1), xzw(v2)));
+    v(2) = dot(xyw(v3),cross(xyw(v1), xyw(v2)));
+    v(3) = -dot(xyz(v3), cross(xyz(v1), xyz(v2)));
     return v;
 }
 
-std::vector<Vector4f>::iterator MathUtil::nearestPoint(const Vector4f &v, std::vector<Vector4f> &vs)
+std::vector<vec4>::iterator MathUtil::nearestPoint(const vec4 &v, std::vector<vec4> &vs)
 {
-    return std::min_element(vs.begin(), vs.end(), [&v](Vector4f &v1, Vector4f &v2)
-    { return (v - v1).squaredNorm() < (v - v2).squaredNorm(); });
+    return std::min_element(vs.begin(), vs.end(), [&v](vec4& v1, vec4& v2)
+                            {
+                                auto d1 = v - v1, d2 = v - v2;
+                                return dot(d1, d1) < dot(d2, d2);
+                            });
 }

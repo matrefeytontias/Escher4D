@@ -31,12 +31,6 @@ set(SOURCES ${SOURCES}
 
 add_executable(EscherDemo ${SOURCES})
 
-file(GLOB_RECURSE SOURCES include/Eigen/*)
-
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/include/Eigen PREFIX "Eigen" FILES ${SOURCES})
-
-target_sources(EscherDemo PRIVATE ${SOURCES})
-
 target_compile_features(EscherDemo PRIVATE cxx_std_17)
 
 target_include_directories(EscherDemo PUBLIC include)
@@ -59,11 +53,12 @@ add_subdirectory(ThirdParty/glfw)
 # ThirdParty/imgui/CMakeLists.txt is configured with GLFW and OpenGL3
 add_subdirectory(ThirdParty/imgui)
 
-target_link_libraries(EscherDemo PUBLIC glfw imgui imgui-glfw imgui-opengl3)
-
 # Empty
 set(EMPTY_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
 add_subdirectory(ThirdParty/Empty)
 
 # tetgen
 add_subdirectory(ThirdParty/tetgen1.6.0)
+
+# Link everything
+target_link_libraries(EscherDemo PUBLIC glfw imgui imgui-glfw imgui-opengl3 Empty)

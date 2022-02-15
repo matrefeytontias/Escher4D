@@ -9,12 +9,15 @@
 #include <stdexcept>
 #include <string>
 
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-#include <Eigen/Eigen>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <Empty/math/vec.h>
+#include <Empty/math/mat.h>
+#include <Empty/render/gl/ShaderProgram.hpp>
+#include <Empty/render/gl/Texture.h>
 
 #include "Camera4.hpp"
 #include "FSQuadRenderContext.hpp"
@@ -168,9 +171,9 @@ int _main(int, char *argv[])
     glEnable(GL_DEPTH_TEST);
     
     Camera4 camera(window);
-    camera.pos << 0, 1.5, 0, 0;
+    camera.pos = math::vec4(0.f, 1.5f, 0.f, 0.f);
     
-    Eigen::Matrix4f p(Eigen::Matrix4f::Identity());
+    math::mat4 p = math::mat4::Identity();
     ShaderProgram program;
     program.attach(GL_VERTEX_SHADER, "shaders/vertex.glsl");
     program.attach(GL_GEOMETRY_SHADER, "shaders/geometry.glsl");
@@ -179,7 +182,7 @@ int _main(int, char *argv[])
     // Load geometry
     Geometry4 cubeGeometry, holedGeometry;
     {
-        std::vector<Eigen::Vector3f> vertices;
+        std::vector<math::vec3> vertices;
         std::vector<unsigned int> tris, tetras;
         // Cube
         if(!OFFLoader::loadModel("models/cube", vertices, tris, tetras))
@@ -213,14 +216,14 @@ int _main(int, char *argv[])
         for(unsigned int k = 0; k < 5; k++)
         {
             room1.addChild(cubeRC);
-            room1[k].color << 1, 1, 1, 1;
+            room1[k].color = math::vec4(1, 1, 1, 1);
         }
         room1.addChild(holedRC);
-        room1[5].color << 1, 0, 0, 1;
+        room1[5].color = math::vec4(1, 0, 0, 1);
         room1.addChild(holedRC);
-        room1[6].color << 0, 1, 0, 1;
+        room1[6].color = math::vec4(0, 1, 0, 1);
         room1.addChild(holedRC);
-        room1[7].color << 0, 0, 1, 1;
+        room1[7].color = math::vec4(0, 0, 1, 1);
         
         // +X
         room1[5].pos(0) = .5;
@@ -250,8 +253,8 @@ int _main(int, char *argv[])
     complexDemo(complex);
     
     Object4 &cube = Object4::scene.addChild(cubeRC);
-    cube.scale(Vector4f(0.5, 0.5, 0.5, 5)).pos << 0, 2, 5, 0;
-    cube.color << 1, 1, 1, 1;
+    cube.scale(math::vec4(0.5f, 0.5f, 0.5f, 5.f)).pos = math::vec4(0, 2, 5, 0);
+    cube.color = math::vec4(1, 1, 1, 1);
     cube.insideOut = true;
     
     // Print amount of tetrahedra for fun
@@ -274,7 +277,7 @@ int _main(int, char *argv[])
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
-    complex.scale(Vector4f(10, 6, 10, 10)).pos(1) = 3;
+    complex.scale(math::vec4(10, 6, 10, 10)).pos(1) = 3;
     
     /// Setup deferred shading
     ShaderProgram quadProgram;
@@ -294,9 +297,9 @@ int _main(int, char *argv[])
     
     std::vector<int> cellsCompBuffer; // ivec4
     std::vector<int> objIndexCompBuffer; // int
-    std::vector<Vector4f> vertexCompBuffer; // vec4
-    std::vector<Matrix4f> MCompBuffer; // mat4
-    std::vector<Vector4f> MtCompBuffer; // vec4
+    std::vector<math::vec4> vertexCompBuffer; // vec4
+    std::vector<math::mat4> MCompBuffer; // mat4
+    std::vector<math::vec4> MtCompBuffer; // vec4
     
     int objectIndex = 0;
     Object4::scene.visit([&](const Object4 &obj)
@@ -364,14 +367,13 @@ int _main(int, char *argv[])
         float now = glfwGetTime(), dt = now - timeBase;
         timeBase = now;
         
-        Vector4f lightPos;
+        math::vec4 lightPos(sin(now) * 2.f, sin(now * 1.5f) * 1.5f + 2.f, 0.f, cos(now) * 2.f);
         Transform4 vt = camera.computeViewTransform();
-        lightPos << sin(now) * 2, sin(now * 1.5) * 1.5 + 2, 0, cos(now) * 2;
         lightPos = vt.apply(lightPos);
         
         program.use();
         
-        program.uniformMatrix4fv("P", 1, &p.data()[0]);
+        program.uniformMatrix4fv("P", 1, p);
         
         Object4::scene.render(camera);
         
@@ -397,7 +399,7 @@ int _main(int, char *argv[])
         glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
         computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
         computeProgram.uniform2i("uTexSize", display_w, display_h);
-        computeProgram.uniformMatrix4fv("V", 1, vt.mat.data());
+        computeProgram.uniformMatrix4fv("V", 1, vt.mat);
         computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
         // Perform the actual computation
         svComputer.compute(MCompBuffer, MtCompBuffer);

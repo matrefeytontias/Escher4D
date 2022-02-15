@@ -4,9 +4,11 @@
 #include <iterator>
 #include <vector>
 
-#include <Eigen/Eigen>
-
-using namespace Eigen;
+namespace math
+{
+	template <typename T> struct _vec4;
+	using vec4 = _vec4<float>;
+}
 
 namespace MathUtil
 {
@@ -14,11 +16,11 @@ namespace MathUtil
 /**
  * 4D cross product.
  */
-Vector4f cross4(const Vector4f &v1, const Vector4f &v2, const Vector4f &v3);
+math::vec4 cross4(const math::vec4 &v1, const math::vec4 &v2, const math::vec4 &v3);
 /**
  * Returns the index of the nearest point in an array to a point.
  */
-std::vector<Vector4f>::iterator nearestPoint(const Vector4f &v, std::vector<Vector4f> &vs);
+std::vector<math::vec4>::iterator nearestPoint(const math::vec4 &v, std::vector<math::vec4> &vs);
 
 };
 

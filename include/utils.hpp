@@ -5,11 +5,22 @@
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <vector>
 
-#include <Eigen/Eigen>
 #include <glad/glad.h>
 
+#ifdef _WIN32
+#undef near
+#undef far
+#endif
+
 #define M_PI 3.1415926535897932384626433832795f
+
+namespace math
+{
+    template <typename T> struct _mat4;
+    using mat4 = _mat4<float>;
+}
 
 /**
  * Sets the working directory.
@@ -55,41 +66,15 @@ void _checkGLerror(const char *file, int line);
  */
 #define fatal(s) do { std::stringstream ss; ss << __FILE__ << ":" << __LINE__ << " : " << s << std::endl; throw std::runtime_error(ss.str()); } while(0)
 
-
-#ifndef min
-/**
- * Minimum of two values of the same comparable type.
- */
-template <typename T> inline T min(T a, T b)
-{
-    return a < b ? a : b;
-}
-#endif
-
-#ifndef max
-/**
- * Maximum of two values of the same comparable type.
- */
-template <typename T> inline T max(T a, T b)
-{
-    return a > b ? a : b;
-}
-#endif
-
-/**
- * Keep a value in between two other values. All must be of the same comparable type.
- */
-#define clamp(v, a, b) min(b, max(a, v))
-
 /**
  * Constructs a 4x4 3D perspective matrix in the given matrix object based on FOV,
  * aspect ratio, near plane and far plane.
  */
-void perspective(Eigen::Matrix4f &p, float fov, float ratio, float near, float far);
+void perspective(math::mat4 &p, float fov, float ratio, float near, float far);
 /**
  * Shorthand function to modify the aspect ratio of a perspective matrix.
  */
-void setAspectRatio(Eigen::Matrix4f &p, float ratio);
+void setAspectRatio(math::mat4 &p, float ratio);
 
 /**
  * Shorthand function to display an OpenGL texture as a quarter of the screen.

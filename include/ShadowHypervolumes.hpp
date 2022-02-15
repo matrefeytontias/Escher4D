@@ -3,7 +3,8 @@
 
 #include <vector>
 
-#include <Eigen/Eigen>
+#include <Empty/math/vec.h>
+#include <Empty/math/mat.h>
 #include <GLFW/glfw3.h>
 
 #include "ShaderProgram.hpp"
@@ -20,8 +21,6 @@
  */
 class ShadowHypervolumes
 {
-    typedef Eigen::Vector4f Vector4f;
-    typedef Eigen::Matrix4f Matrix4f;
 public:
     ShadowHypervolumes()
     {
@@ -34,7 +33,7 @@ public:
      * Re-initializes the state of the shadow volumes computer. Call this when changing
      * screen dimensions, shadow-casting tetrahedra or vertices.
      */
-    void reinit(int w, int h, Texture &texPos, std::vector<int> &cells, std::vector<int> &objIndices, std::vector<Vector4f> &vertices)
+    void reinit(int w, int h, Texture &texPos, std::vector<int> &cells, std::vector<int> &objIndices, std::vector<math::vec4> &vertices)
     {
         _w = w;
         _h = h;
@@ -44,7 +43,7 @@ public:
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[1]);
         glBufferData(GL_SHADER_STORAGE_BUFFER, objIndices.size() * sizeof(int), &objIndices[0], GL_STATIC_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[2]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, vertices.size() * sizeof(Vector4f), &vertices[0](0), GL_STATIC_DRAW);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, vertices.size() * sizeof(math::vec4), &vertices[0](0), GL_STATIC_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[5]);
         // AABB hierarchy has 4 * 2 floats per pixel
         glBufferData(GL_SHADER_STORAGE_BUFFER, BUFFER_SIZE * 4 * 2 * sizeof(float), NULL, GL_DYNAMIC_COPY);
@@ -80,15 +79,15 @@ public:
      * Builds the shadow hierarchy, which is then retrievable through buffer binding
      * #5 in a shader.
      */
-    void compute(std::vector<Matrix4f> &ms, std::vector<Vector4f> &ts)
+    void compute(std::vector<math::mat4> &ms, std::vector<math::vec4> &ts)
     {
         // For good measure
         _computeProgram.use();
         
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[3]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, ms.size() * sizeof(Matrix4f), ms[0].data(), GL_STREAM_DRAW);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, ms.size() * sizeof(math::mat4), ms[0], GL_STREAM_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[4]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, ts.size() * sizeof(Vector4f), &ts[0](0), GL_STREAM_DRAW);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, ts.size() * sizeof(math::vec4), &ts[0](0), GL_STREAM_DRAW);
         
         for(unsigned int k = 0; k < 7; k++)
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, k, _buffers[k]);

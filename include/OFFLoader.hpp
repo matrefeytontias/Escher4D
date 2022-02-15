@@ -5,12 +5,10 @@
 #include <string>
 #include <vector>
 
-#include <Eigen/Eigen>
+#include <Empty/math/vec.h>
 
 #include "Geometry4.hpp"
 #include "utils.hpp"
-
-using namespace Eigen;
 
 namespace OFFLoader
 {
@@ -22,7 +20,7 @@ namespace OFFLoader
  * respectively.
  * @return  whether or not the operation succeeded
  */
-bool loadModel(const string &baseName, std::vector<Vector3f> &v,
+bool loadModel(const string &baseName, std::vector<math::vec3> &v,
     std::vector<unsigned int> &tris, std::vector<unsigned int> &tetras)
 {
     try
@@ -35,7 +33,8 @@ bool loadModel(const string &baseName, std::vector<Vector3f> &v,
         if(offFile[0] != "OFF")
             return false;
         size_t nb = stoi(offFile[1]); // grab the first integer
-        v.resize(nb, Vector3f::Zero());
+        v.resize(nb, math::vec3(0, 0, 0));
+
         for(unsigned int i = 0; i < nb; i++)
         {
             std::vector<string> vertex = split(offFile[i + 2], " \t");

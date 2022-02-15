@@ -147,7 +147,7 @@ struct Object4 : public Transform4
         render(camera.computeViewTransform());
     }
     
-    Vector4f color;
+    math::vec4 color;
     
     bool castShadows = true;
     bool insideOut = false;
@@ -168,9 +168,11 @@ protected:
         if(_rc)
         {
             _rc->_program.use();
-            _rc->_program.uniformMatrix4fv("MV", 1, &mv.mat.data()[0]);
-            Matrix4f tinvmv = mv.mat.inverse().transpose();
-            _rc->_program.uniformMatrix4fv("tinvMV", 1, &tinvmv.data()[0]);
+            _rc->_program.uniformMatrix4fv("MV", 1, mv.mat);
+            // TODO
+            // math::mat4 tinvmv = mv.mat.inverse().transpose();
+            math::mat4 tinvmv = mv.mat;
+            _rc->_program.uniformMatrix4fv("tinvMV", 1, tinvmv);
             _rc->_program.uniform4f("MVt", mv.pos(0), mv.pos(1), mv.pos(2), mv.pos(3));
             _rc->_program.uniform4f("uColor", color(0), color(1), color(2), color(3));
             _rc->_program.uniform1i("uInsideOut", insideOut);

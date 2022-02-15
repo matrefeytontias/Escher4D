@@ -7,17 +7,16 @@
 #include <iterator>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #ifdef _WIN32
 #include <direct.h>
-#undef near
-#undef far
 #define chdir _chdir
 #else
 #include <unistd.h>
 #endif
 
-#include <Eigen/Eigen>
+#include <Empty/math/mat.h>
 
 void setwd(char **argv)
 {
@@ -104,7 +103,7 @@ void _checkGLerror(const char *file, int line)
 }
 
 // Expects an identity matrix as input
-void perspective(Eigen::Matrix4f &p, float fov, float ratio, float near, float far)
+void perspective(math::mat4 &p, float fov, float ratio, float near, float far)
 {
     float d = 1 / tan(fov * M_PI / 180 / 2);
     float ir = 1. / (near - far);
@@ -117,7 +116,7 @@ void perspective(Eigen::Matrix4f &p, float fov, float ratio, float near, float f
     p(2, 3) = 2 * near * far * ir;
 }
 
-void setAspectRatio(Eigen::Matrix4f &p, float ratio)
+void setAspectRatio(math::mat4 &p, float ratio)
 {
     p(1, 1) = -p(0, 0) * ratio;
 }
