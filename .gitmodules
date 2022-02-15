@@ -1,0 +1,10 @@
+[submodule "ThirdParty/glfw"]
+	path = ThirdParty/glfw
+	url = https://github.com/glfw/glfw
+	branch = latest
+[submodule "ThirdParty/imgui/imgui"]
+	path = ThirdParty/imgui/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "ThirdParty/Empty"]
+	path = ThirdParty/Empty
+	url = https://github.com/matrefeytontias/Empty
