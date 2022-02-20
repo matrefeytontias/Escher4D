@@ -101,7 +101,7 @@ struct Geometry4
                 unsigned int *cell = &cells[c];
                 math::vec4 cellN = MathUtil::cross4(vertices[cell[1]] - vertices[cell[0]], vertices[cell[2]] - vertices[cell[0]],
                     vertices[cell[3]] - vertices[cell[0]]);
-                float paraVolume = cellN.norm();
+                float paraVolume = math::length(cellN);
                 auto sdist = [&](int i, int j) { auto r = (vertices[cell[i % 4]] - vertices[cell[j % 4]]); return math::dot(r, r); };
                 
                 // Skeleton checking for normal std::vector orientation
@@ -172,8 +172,8 @@ struct Geometry4
         min = max = vertices[0];
         for(const math::vec4 &v : vertices)
         {
-            min = v.array().min(min.array()).matrix();
-            max = v.array().max(max.array()).matrix();
+            min = math::min(v, min);
+            max = math::max(v, max);
         }
     }
     

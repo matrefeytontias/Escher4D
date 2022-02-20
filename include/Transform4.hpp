@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <vector>
 
-#include <Empty/math/mat.h>
+#include <Empty/math/funcs.h>
 
 #include "MathUtil.hpp"
 #include "Rotor4.hpp"
@@ -57,8 +57,7 @@ struct Transform4
     
     Transform4 &scale(float factor)
     {
-        // TODO
-        mat = mat * factor;
+        mat *= factor;
         return *this;
     }
     

@@ -18,12 +18,8 @@ struct Camera4 : private Transform4
      */
     Transform4 computeViewTransform() const
     {
-        // TODO
-        // math::mat4 m = mat.inverse();
-        math::mat4 m = mat;
-        // TODO
-        // return Transform4(m, -(m * pos));
-        return Transform4(m, pos);
+        math::mat4 m = math::inverse(mat);
+        return Transform4(m, -(m * pos));
     }
     /**
      * Processes input for camera movement.
@@ -34,12 +30,15 @@ struct Camera4 : private Transform4
         // Movement
         math::vec4 dr(glfwGetKey(_window, GLFW_KEY_D) - glfwGetKey(_window, GLFW_KEY_A),
             0, glfwGetKey(_window, GLFW_KEY_S) - glfwGetKey(_window, GLFW_KEY_W), 0);
-        dr = math::normalize(dr);
-        dr *= speed * dt;
-        
-        dr = mat * dr;
-        dr(1) = 0; // let's not fly off
-        pos += dr;
+        if (dot(dr, dr) > 0.5) // will always be 1 or 2
+        {
+            dr = math::normalize(dr);
+            dr *= speed * dt;
+
+            dr = mat * dr;
+            dr(1) = 0; // let's not fly off
+            pos += dr;
+        }
         
         // Field of view rotation
         double mouseX, mouseY;
@@ -47,7 +46,7 @@ struct Camera4 : private Transform4
         _xz += (mouseX - _prevMouseX) / rotationDivisorX;
         _yz += (mouseY - _prevMouseY) / rotationDivisorY;
         // Cap _yz rotation at head and feet
-        _yz = clamp(_yz, -(float)M_PI / 2 + 0.01f, (float)M_PI / 2 - 0.01f);
+        _yz = math::clamp(_yz, -(float)M_PI / 2 + 0.01f, (float)M_PI / 2 - 0.01f);
         
         math::vec4 dir = math::vec4(-sin(_xz) * cos(_yz), sin(_yz), cos(_xz) * cos(_yz), 0.f);
         lookAt(dir, math::vec4(0, 1, 0, 0), math::vec4(0, 0, 0, 1));
