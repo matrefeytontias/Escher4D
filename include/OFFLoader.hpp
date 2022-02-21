@@ -20,7 +20,7 @@ namespace OFFLoader
  * respectively.
  * @return  whether or not the operation succeeded
  */
-bool loadModel(const string &baseName, std::vector<math::vec3> &v,
+bool loadModel(const string &baseName, std::vector<Empty::math::vec3> &v,
     std::vector<unsigned int> &tris, std::vector<unsigned int> &tetras)
 {
     try
@@ -33,9 +33,9 @@ bool loadModel(const string &baseName, std::vector<math::vec3> &v,
         if(offFile[0] != "OFF")
             return false;
         size_t nb = stoi(offFile[1]); // grab the first integer
-        v.resize(nb, math::vec3(0, 0, 0));
+        v.resize(nb, Empty::math::vec3(0, 0, 0));
 
-        for(unsigned int i = 0; i < nb; i++)
+        for(size_t i = 0; i < nb; i++)
         {
             std::vector<string> vertex = split(offFile[i + 2], " \t");
             v[i](0) = stof(vertex[0]);
@@ -45,7 +45,7 @@ bool loadModel(const string &baseName, std::vector<math::vec3> &v,
         // Read triangles
         nb = stoi(faceFile[0]);
         tris.resize(nb * 3);
-        for(unsigned int i = 0; i < nb; i++)
+        for(size_t i = 0; i < nb; i++)
         {
             std::vector<string> tri = split(faceFile[i + 1], " \t");
             tris[i * 3] = stoi(tri[1]);
@@ -55,7 +55,7 @@ bool loadModel(const string &baseName, std::vector<math::vec3> &v,
         // Read tetrahedra
         nb = stoi(tetraFile[0]);
         tetras.resize(nb * 4);
-        for(unsigned int i = 0; i < nb; i++)
+        for(size_t i = 0; i < nb; i++)
         {
             std::vector<string> tetra = split(tetraFile[i + 1], " \t");
             tetras[i * 4] = stoi(tetra[1]);
@@ -66,7 +66,7 @@ bool loadModel(const string &baseName, std::vector<math::vec3> &v,
         
         return true;
     }
-    catch(std::exception &e)
+    catch(std::exception&)
     {
         return false;
     }

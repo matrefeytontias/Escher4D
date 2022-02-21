@@ -1,4 +1,3 @@
-#define GLFW_DLL
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 // Define these only in *one* .cpp file.
 #define STB_IMAGE_IMPLEMENTATION
@@ -16,8 +15,8 @@
 #include <GLFW/glfw3.h>
 #include <Empty/math/vec.h>
 #include <Empty/math/mat.h>
-#include <Empty/render/gl/ShaderProgram.hpp>
-#include <Empty/render/gl/Texture.h>
+#include <Empty/gl/ShaderProgram.hpp>
+#include <Empty/gl/Texture.h>
 
 #include "Camera4.hpp"
 #include "FSQuadRenderContext.hpp"
@@ -171,9 +170,9 @@ int _main(int, char *argv[])
     glEnable(GL_DEPTH_TEST);
     
     Camera4 camera(window);
-    camera.pos = math::vec4(0.f, 1.5f, 0.f, 0.f);
+    camera.pos = Empty::math::vec4(0.f, 1.5f, 0.f, 0.f);
     
-    math::mat4 p = math::mat4::Identity();
+    Empty::math::mat4 p = Empty::math::mat4::Identity();
     ShaderProgram program;
     program.attach(GL_VERTEX_SHADER, "shaders/vertex.glsl");
     program.attach(GL_GEOMETRY_SHADER, "shaders/geometry.glsl");
@@ -182,7 +181,7 @@ int _main(int, char *argv[])
     // Load geometry
     Geometry4 cubeGeometry, holedGeometry;
     {
-        std::vector<math::vec3> vertices;
+        std::vector<Empty::math::vec3> vertices;
         std::vector<unsigned int> tris, tetras;
         // Cube
         if(!OFFLoader::loadModel("models/cube", vertices, tris, tetras))
@@ -190,7 +189,7 @@ int _main(int, char *argv[])
             trace("Can't load that shizzle");
             return 0;
         }
-        cubeGeometry.from3D(vertices, tris, tetras, 0.1);
+        cubeGeometry.from3D(vertices, tris, tetras, 0.1f);
         cubeGeometry.unindex();
         cubeGeometry.recomputeNormals(true);
         cubeGeometry.uploadGPU();
@@ -200,7 +199,7 @@ int _main(int, char *argv[])
             trace("Can't load that shizzle");
             return 0;
         }
-        holedGeometry.from3D(vertices, tris, tetras, 0.1);
+        holedGeometry.from3D(vertices, tris, tetras, 0.1f);
         holedGeometry.unindex();
         holedGeometry.recomputeNormals(true);
         holedGeometry.uploadGPU();
@@ -216,14 +215,14 @@ int _main(int, char *argv[])
         for(unsigned int k = 0; k < 5; k++)
         {
             room1.addChild(cubeRC);
-            room1[k].color = math::vec4(1, 1, 1, 1);
+            room1[k].color = Empty::math::vec4(1, 1, 1, 1);
         }
         room1.addChild(holedRC);
-        room1[5].color = math::vec4(1, 0, 0, 1);
+        room1[5].color = Empty::math::vec4(1, 0, 0, 1);
         room1.addChild(holedRC);
-        room1[6].color = math::vec4(0, 1, 0, 1);
+        room1[6].color = Empty::math::vec4(0, 1, 0, 1);
         room1.addChild(holedRC);
-        room1[7].color = math::vec4(0, 0, 1, 1);
+        room1[7].color = Empty::math::vec4(0, 0, 1, 1);
         
         // +X
         room1[5].pos(0) = .5;
@@ -253,8 +252,8 @@ int _main(int, char *argv[])
     complexDemo(complex);
     
     Object4 &cube = Object4::scene.addChild(cubeRC);
-    cube.scale(math::vec4(0.5f, 0.5f, 0.5f, 5.f)).pos = math::vec4(0, 2, 5, 0);
-    cube.color = math::vec4(1, 1, 1, 1);
+    cube.scale(Empty::math::vec4(0.5f, 0.5f, 0.5f, 5.f)).pos = Empty::math::vec4(0, 2, 5, 0);
+    cube.color = Empty::math::vec4(1, 1, 1, 1);
     cube.insideOut = true;
     
     // Print amount of tetrahedra for fun
@@ -264,20 +263,20 @@ int _main(int, char *argv[])
         const Model4RenderContext *rc = obj.getRenderContext();
         if(rc)
         {
-            tetrahedra += rc->geometry.isIndexed() ? rc->geometry.cells.size() / 4
-                : rc->geometry.vertices.size() / 4;
+            tetrahedra += static_cast<int>(rc->geometry.isIndexed() ? rc->geometry.cells.size() / 4
+                : rc->geometry.vertices.size() / 4);
         }
     });
     
-    perspective(p, 90, (float)display_w / display_h, 0.01, 40);
+    perspective(p, 90, (float)display_w / display_h, 0.01f, 40.f);
     
     float lightIntensity = 10.f, lightRadius = 20;
     
-    float timeBase = glfwGetTime();
+    float timeBase = static_cast<float>(glfwGetTime());
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
-    complex.scale(math::vec4(10, 6, 10, 10)).pos(1) = 3;
+    complex.scale(Empty::math::vec4(10, 6, 10, 10)).pos(1) = 3;
     
     /// Setup deferred shading
     ShaderProgram quadProgram;
@@ -297,9 +296,9 @@ int _main(int, char *argv[])
     
     std::vector<int> cellsCompBuffer; // ivec4
     std::vector<int> objIndexCompBuffer; // int
-    std::vector<math::vec4> vertexCompBuffer; // vec4
-    std::vector<math::mat4> MCompBuffer; // mat4
-    std::vector<math::vec4> MtCompBuffer; // vec4
+    std::vector<Empty::math::vec4> vertexCompBuffer; // vec4
+    std::vector<Empty::math::mat4> MCompBuffer; // mat4
+    std::vector<Empty::math::vec4> MtCompBuffer; // vec4
     
     int objectIndex = 0;
     Object4::scene.visit([&](const Object4 &obj)
@@ -310,7 +309,7 @@ int _main(int, char *argv[])
             if(rc)
             {
                 const Geometry4 &geom = rc->geometry;
-                const int vertexCount = vertexCompBuffer.size();
+                const int vertexCount = static_cast<int>(vertexCompBuffer.size());
                 if(geom.isIndexed())
                 {
                     for(unsigned int k = 0; k < geom.cells.size(); k++)
@@ -364,10 +363,10 @@ int _main(int, char *argv[])
         glViewport(0, 0, display_w, display_h);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        float now = glfwGetTime(), dt = now - timeBase;
+        float now = static_cast<float>(glfwGetTime()), dt = now - timeBase;
         timeBase = now;
         
-        math::vec4 lightPos(sin(now) * 2.f, sin(now * 1.5f) * 1.5f + 2.f, 0.f, cos(now) * 2.f);
+        Empty::math::vec4 lightPos(sin(now) * 2.f, sin(now * 1.5f) * 1.5f + 2.f, 0.f, cos(now) * 2.f);
         Transform4 vt = camera.computeViewTransform();
         lightPos = vt.apply(lightPos);
         
@@ -430,9 +429,9 @@ int _main(int, char *argv[])
             if(ImGui::TreeNode("Camera control"))
             {
                 ImGui::SliderFloat("Movement speed", &camera.speed, 1, 10);
-                ImGui::SliderFloat("Rotation divisor X", &camera.rotationDivisorX, 1, display_w);
-                ImGui::SliderFloat("Rotation divisor Y", &camera.rotationDivisorY, 1, display_h);
-                ImGui::SliderFloat("XW+ZW rotation speed", &camera.xwzwSpeed, 0.1, (float)M_PI * 2);
+                ImGui::SliderFloat("Rotation divisor X", &camera.rotationDivisorX, 1, (float)display_w);
+                ImGui::SliderFloat("Rotation divisor Y", &camera.rotationDivisorY, 1, (float)display_h);
+                ImGui::SliderFloat("XW+ZW rotation speed", &camera.xwzwSpeed, 0.1f, (float)M_PI * 2.f);
                 ImGui::TreePop();
             }
         ImGui::End();

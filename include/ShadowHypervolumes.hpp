@@ -33,17 +33,17 @@ public:
      * Re-initializes the state of the shadow volumes computer. Call this when changing
      * screen dimensions, shadow-casting tetrahedra or vertices.
      */
-    void reinit(int w, int h, Texture &texPos, std::vector<int> &cells, std::vector<int> &objIndices, std::vector<math::vec4> &vertices)
+    void reinit(int w, int h, Texture &texPos, std::vector<int> &cells, std::vector<int> &objIndices, std::vector<Empty::math::vec4> &vertices)
     {
         _w = w;
         _h = h;
-        _cellsAmount = cells.size() / 4;
+        _cellsAmount = static_cast<int>(cells.size() / 4);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[0]);
         glBufferData(GL_SHADER_STORAGE_BUFFER, cells.size() * sizeof(int), &cells[0], GL_STATIC_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[1]);
         glBufferData(GL_SHADER_STORAGE_BUFFER, objIndices.size() * sizeof(int), &objIndices[0], GL_STATIC_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[2]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, vertices.size() * sizeof(math::vec4), &vertices[0](0), GL_STATIC_DRAW);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, vertices.size() * sizeof(Empty::math::vec4), &vertices[0](0), GL_STATIC_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[5]);
         // AABB hierarchy has 4 * 2 floats per pixel
         glBufferData(GL_SHADER_STORAGE_BUFFER, BUFFER_SIZE * 4 * 2 * sizeof(float), NULL, GL_DYNAMIC_COPY);
@@ -79,15 +79,15 @@ public:
      * Builds the shadow hierarchy, which is then retrievable through buffer binding
      * #5 in a shader.
      */
-    void compute(std::vector<math::mat4> &ms, std::vector<math::vec4> &ts)
+    void compute(std::vector<Empty::math::mat4> &ms, std::vector<Empty::math::vec4> &ts)
     {
         // For good measure
         _computeProgram.use();
         
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[3]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, ms.size() * sizeof(math::mat4), ms[0], GL_STREAM_DRAW);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, ms.size() * sizeof(Empty::math::mat4), ms[0], GL_STREAM_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _buffers[4]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, ts.size() * sizeof(math::vec4), &ts[0](0), GL_STREAM_DRAW);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, ts.size() * sizeof(Empty::math::vec4), &ts[0](0), GL_STREAM_DRAW);
         
         for(unsigned int k = 0; k < 7; k++)
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, k, _buffers[k]);
@@ -102,13 +102,13 @@ public:
     }
     
 private:
-    const int BUFFER_SIZE = 8 * 4 + 32 * 32 + 256 * 128 + 1024 * 1024;
+    const size_t BUFFER_SIZE = 8 * 4 + 32 * 32 + 256 * 128 + 1024 * 1024;
     // 0 : cells, 1 : object index, 2 : vertices, 3 : M matrices, 4 : translation
     // part of M matrices, 5 : AABB hierarchy, 6 : shadow hierarchy
     GLuint _buffers[7];
     ShaderProgram _computeProgram, _aabbProgram;
-    int _w, _h;
-    int _cellsAmount;
+    int _w = 1, _h = 1;
+    int _cellsAmount = 0;
 };
 
 #endif

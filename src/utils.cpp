@@ -9,30 +9,7 @@
 #include <string>
 #include <vector>
 
-#ifdef _WIN32
-#include <direct.h>
-#define chdir _chdir
-#else
-#include <unistd.h>
-#endif
-
 #include <Empty/math/mat.h>
-
-void setwd(char **argv)
-{
-    char *buf = new char[strlen(argv[0]) + 1];
-    strcpy(buf, argv[0]);
-    // Handle both possible separators
-    char *p = strrchr(buf, '/');
-    if(!p)
-        p = strrchr(buf, '\\');
-    if(p)
-    {
-        *(p+1) = '\0';
-        chdir(buf);
-    }
-    delete[] buf;
-}
 
 std::string getFileContents(const std::string &path)
 {
@@ -61,7 +38,7 @@ std::vector<std::string> split(const std::string &s, const std::string &delim)
         index = minSplitting + 1;
     }
     
-    std::remove_if(r.begin(), r.end(), [](std::string &s) { return !s.size(); });
+    (void)std::remove_if(r.begin(), r.end(), [](std::string &s) { return !s.size(); });
     return r;
 }
 
@@ -103,10 +80,10 @@ void _checkGLerror(const char *file, int line)
 }
 
 // Expects an identity matrix as input
-void perspective(math::mat4 &p, float fov, float ratio, float near, float far)
+void perspective(Empty::math::mat4 &p, float fov, float ratio, float near, float far)
 {
-    float d = 1 / tan(fov * M_PI / 180 / 2);
-    float ir = 1. / (near - far);
+    float d = 1.f / tan(fov * M_PI / 180 / 2);
+    float ir = 1.f / (near - far);
     
     p(0, 0) = d;
     p(1, 1) = -d * ratio;
@@ -116,7 +93,7 @@ void perspective(math::mat4 &p, float fov, float ratio, float near, float far)
     p(2, 3) = 2 * near * far * ir;
 }
 
-void setAspectRatio(math::mat4 &p, float ratio)
+void setAspectRatio(Empty::math::mat4 &p, float ratio)
 {
     p(1, 1) = -p(0, 0) * ratio;
 }

@@ -118,7 +118,7 @@ void ShaderProgram::uniformMatrix3fv(const string &name, GLuint count, const GLf
 void ShaderProgram::vertexAttribPointer(const string &name, GLuint size, GLenum type, GLsizei stride, const GLuint offset)
 {
     glEnableVertexAttribArray(ensureAttrib(name));
-    glVertexAttribPointer(_attributes[name], size, type, GL_FALSE, stride, reinterpret_cast<GLvoid*>(offset));
+    glVertexAttribPointer(_attributes[name], size, type, GL_FALSE, stride, reinterpret_cast<GLvoid*>(static_cast<uintptr_t>(offset)));
 }
 
 Texture &ShaderProgram::getTexture(const string &name)

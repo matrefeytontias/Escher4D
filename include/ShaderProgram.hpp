@@ -79,7 +79,7 @@ public:
     void vertexAttribPointer(const string &name, GLuint size, GLenum type, GLsizei stride, const GLuint offset);
     Texture &getTexture(const string &name);
     Texture &registerTexture(const string &name, const Texture &tex);
-    unsigned int getTexturesAmount() const { return _textures.size(); }
+    unsigned int getTexturesAmount() const { return static_cast<unsigned int>(_textures.size()); }
     GLint ensureUniform(const string &name);
     GLint ensureAttrib(const string &name);
 private:

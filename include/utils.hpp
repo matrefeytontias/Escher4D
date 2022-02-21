@@ -16,17 +16,12 @@
 
 #define M_PI 3.1415926535897932384626433832795f
 
-namespace math
+namespace Empty::math
 {
     template <typename T> struct _mat4;
     using mat4 = _mat4<float>;
 }
 
-/**
- * Sets the working directory.
- * @param   argv    the program's argv, retrieved through the main function
- */
-void setwd(char **argv);
 /**
  * Returns the contents of a file as a string. Raises a runtime_error exception
  * upon failure.
@@ -70,11 +65,11 @@ void _checkGLerror(const char *file, int line);
  * Constructs a 4x4 3D perspective matrix in the given matrix object based on FOV,
  * aspect ratio, near plane and far plane.
  */
-void perspective(math::mat4 &p, float fov, float ratio, float near, float far);
+void perspective(Empty::math::mat4 &p, float fov, float ratio, float near, float far);
 /**
  * Shorthand function to modify the aspect ratio of a perspective matrix.
  */
-void setAspectRatio(math::mat4 &p, float ratio);
+void setAspectRatio(Empty::math::mat4 &p, float ratio);
 
 /**
  * Shorthand function to display an OpenGL texture as a quarter of the screen.

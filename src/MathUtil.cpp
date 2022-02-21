@@ -7,7 +7,7 @@
 #include <Empty/math/vec.h>
 #include <Empty/math/funcs.h>
 
-using namespace math;
+using namespace Empty::math;
 
 vec4 MathUtil::cross4(const vec4 &v1, const vec4 &v2, const vec4 &v3)
 {

@@ -40,7 +40,7 @@ namespace HierarchicalBuffer
      */
     inline float *getChild(float *ptr, float *bufferBase, int level, int dx, int dy)
     {
-        return (&ptr[1] - bufferBase) * 32 + bufferBase + dy * widths[level + 1] + dx;
+        return (&ptr[1] - bufferBase) * 32 + bufferBase + static_cast<uintptr_t>(dy * widths[level + 1] + dx);
     }
 };
 

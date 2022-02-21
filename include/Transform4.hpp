@@ -22,13 +22,13 @@ enum Planes4
 
 struct Transform4
 {
-    Transform4() { mat = math::mat4::Identity(); pos = math::vec4(0, 0, 0, 0); }
-    Transform4(const math::mat4 &m, const math::vec4 &t) : mat(m), pos(t) { }
+    Transform4() { mat = Empty::math::mat4::Identity(); pos = Empty::math::vec4(0, 0, 0, 0); }
+    Transform4(const Empty::math::mat4 &m, const Empty::math::vec4 &t) : mat(m), pos(t) { }
     
     /**
      * Applies this transform to a vector.
      */
-    math::vec4 apply(const math::vec4 &v) const
+    Empty::math::vec4 apply(const Empty::math::vec4 &v) const
     {
         return mat * v + pos;
     }
@@ -46,9 +46,9 @@ struct Transform4
      * Appends a scaling to the current transform.
      * @param
      */
-    Transform4 &scale(const math::vec4 &factor)
+    Transform4 &scale(const Empty::math::vec4 &factor)
     {
-        math::mat4 s = math::mat4::Identity();
+        Empty::math::mat4 s = Empty::math::mat4::Identity();
         for(int k = 0; k < 4; ++k)
             s(k, k) = factor(k);
         mat = s * mat;
@@ -68,7 +68,7 @@ struct Transform4
      */
     Transform4 &rotate(Planes4 p, float angle)
     {
-        math::mat4 r = math::mat4::Identity();
+        Empty::math::mat4 r = Empty::math::mat4::Identity();
         int i = p >> 4, j = p & 0xf;
         float c = cos(angle), s = sin(angle);
         r(i, i) = r(j, j) = c;
@@ -86,13 +86,13 @@ struct Transform4
      * @param   up      the up vector defining the hyperplane to look in. Should be normalized
      * @param   duth    the duth vector (w) normal to the hyperplane to look in. Should be normalized
      */
-    Transform4 &lookAt(const math::vec4 &at, const math::vec4 &up, const math::vec4 &duth)
+    Transform4 &lookAt(const Empty::math::vec4 &at, const Empty::math::vec4 &up, const Empty::math::vec4 &duth)
     {
-        math::mat4 r;
+        Empty::math::mat4 r;
         r.column(2) = at;
-        r.column(0) = math::normalize(MathUtil::cross4(up, at, duth));
-        r.column(1) = math::normalize(MathUtil::cross4(at, duth, r.column(0)));
-        r.column(3) = math::normalize(MathUtil::cross4(r.column(0), r.column(1), at));
+        r.column(0) = Empty::math::normalize(MathUtil::cross4(up, at, duth));
+        r.column(1) = Empty::math::normalize(MathUtil::cross4(at, duth, r.column(0)));
+        r.column(3) = Empty::math::normalize(MathUtil::cross4(r.column(0), r.column(1), at));
         
         mat = r;
         return *this;
@@ -101,12 +101,12 @@ struct Transform4
     /**
      * Linear component of the transform.
      */
-    math::mat4 mat;
+    Empty::math::mat4 mat;
     // Rotor4 mat;
     /**
      * Translation component of the transform.
      */
-    math::vec4 pos;
+    Empty::math::vec4 pos;
 };
 
 #endif
