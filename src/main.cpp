@@ -13,6 +13,7 @@
 #include <imgui_impl_opengl3.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <Empty/Context.hpp>
 #include <Empty/math/vec.h>
 #include <Empty/math/mat.h>
 #include <Empty/gl/ShaderProgram.hpp>
@@ -95,81 +96,133 @@ static void framebufferSizeCallback(GLFWwindow*, int width, int height)
     setupDeferred(width, height);
 }
 
-static void printGLerror(GLenum, GLenum type, GLuint, GLenum severity,
-    GLsizei, const GLchar *message, const void*)
+static void printGLerror(Empty::gl::DebugMessageSource, Empty::gl::DebugMessageType type, Empty::gl::DebugMessageSeverity severity, int,
+    const std::string& message, const void*)
 {
-    std::cerr << "GL callback :" << (type == GL_DEBUG_TYPE_ERROR ? " error" : "")
-        << " type = 0x" << std::hex << type << "(0x" << severity << ") : " << std::dec
+    std::cerr << "GL " << Empty::utils::name(type) << " (" << Empty::utils::name(severity) << ") : "
         << message << std::endl;
 }
+
+struct Context : public Empty::Context, Empty::utils::noncopyable
+{
+    ~Context() override
+    {
+        terminate();
+    }
+
+    static Context& get() { return _instance; }
+
+    bool init(const char* title, int w, int h)
+    {
+        ASSERT(!_init);
+        /// Setup window
+        glfwSetErrorCallback(glfw_error_callback);
+        if (!glfwInit())
+        {
+            trace("Couldn't initialize GLFW");
+            return false;
+        }
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+        window = glfwCreateWindow(w, h, title, NULL, NULL);
+        if (!window)
+        {
+            trace("Couldn't create window");
+            glfwTerminate();
+            return false;
+        }
+        glfwMakeContextCurrent(window);
+        gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+        glfwSwapInterval(0); // no v-sync, live on the edge
+
+        /// Setup ImGui binding
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+        ImGui_ImplOpenGL3_Init("#version 450");
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        glfwSetKeyCallback(window, keyCallback);
+        glfwSetMouseButtonCallback(window, mouseButtonCallback);
+        glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+
+        /// Setup style
+        ImGui::StyleColorsDark();
+        // ImGui::StyleColorsClassic();
+
+        setViewport(w, h);
+        frameWidth = w;
+        frameHeight = h;
+
+        _init = true;
+        return true;
+    }
+
+    void newFrame() const
+    {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+    }
+
+    void swap() const override
+    {
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glfwPollEvents();
+        glfwSwapBuffers(window);
+    }
+
+    void terminate()
+    {
+        if (_init)
+        {
+            ImGui_ImplGlfw_Shutdown();
+            ImGui_ImplOpenGL3_Shutdown();
+            ImGui::DestroyContext();
+            glfwTerminate();
+            _init = false;
+        }
+    }
+
+    int frameWidth, frameHeight;
+    GLFWwindow* window;
+
+private:
+    Context() : Empty::Context(), Empty::utils::noncopyable(), frameWidth(0), frameHeight(0), window(nullptr), _init(false) { }
+    bool _init;
+    static Context _instance;
+};
+
+Context Context::_instance;
 
 // demos.cpp
 void complexDemo(Object4&);
 
 Object4 Object4::scene;
 
-extern "C" {
-    /**
-     * Tell the Nvidia driver to make itself useful.
-     */
-    
-    #ifdef _MSC_VER
-    __declspec(dllexport)
-    #else
-    __attribute__((visibility("default")))
-    #endif
-    uint64_t NvOptimusEnablement = 0x00000001;
-}
-
 int _main(int, char *argv[])
 {
-    /// Setup window
-    glfwSetErrorCallback(glfw_error_callback);
-    if (!glfwInit())
+    Context& context = Context::get();
+    context.init("Escher4D demo", 1280, 720);
+
     {
-        trace("Couldn't initialize GLFW");
-        return 1;
+        using namespace Empty::gl;
+        context.enable(ContextCapability::DebugOutput);
+        context.disable(ContextCapability::DebugOutputSynchronous);
+        context.debugMessageCallback(printGLerror, nullptr);
+        context.debugMessageControl(DebugMessageSource::DontCare, DebugMessageType::DontCare, DebugMessageSeverity::High, true);
+        context.debugMessageControl(DebugMessageSource::DontCare, DebugMessageType::DontCare, DebugMessageSeverity::Medium, true);
+        context.debugMessageControl(DebugMessageSource::DontCare, DebugMessageType::DontCare, DebugMessageSeverity::Low, false);
+        context.debugMessageControl(DebugMessageSource::DontCare, DebugMessageType::DontCare, DebugMessageSeverity::Notification, false);
     }
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-    GLFWwindow *window = glfwCreateWindow(1280, 720, "GLFW Window", NULL, NULL);
-    glfwMakeContextCurrent(window);
-    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-    glfwSwapInterval(0); // no v-sync, live on the edge
+
+    context.setViewport(context.frameWidth, context.frameHeight);
     
-    glEnable(GL_DEBUG_OUTPUT);
-    glDisable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-    glDebugMessageCallback(printGLerror, NULL);
-    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_HIGH, 0, NULL, GL_TRUE);
-    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_MEDIUM, 0, NULL, GL_TRUE);
-    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW, 0, NULL, GL_FALSE);
-    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
+    context.enable(Empty::gl::ContextCapability::DepthTest);
     
-    /// Setup ImGui binding
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
-    ImGui_ImplOpenGL3_Init("#version 450");
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    glfwSetKeyCallback(window, keyCallback);
-    glfwSetMouseButtonCallback(window, mouseButtonCallback);
-    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
-    
-    /// Setup style
-    ImGui::StyleColorsDark();
-    // ImGui::StyleColorsClassic();
-    
-    /// Scene setup
-    int display_w, display_h;
-    glfwGetFramebufferSize(window, &display_w, &display_h);
-    glViewport(0, 0, display_w, display_h);
-    
-    glEnable(GL_DEPTH_TEST);
-    
-    Camera4 camera(window);
+    Camera4 camera(context.window);
     camera.pos = Empty::math::vec4(0.f, 1.5f, 0.f, 0.f);
     
     Empty::math::mat4 p = Empty::math::mat4::Identity();
@@ -268,13 +321,13 @@ int _main(int, char *argv[])
         }
     });
     
-    perspective(p, 90, (float)display_w / display_h, 0.01f, 40.f);
+    perspective(p, 90, (float)context.frameWidth / context.frameHeight, 0.01f, 40.f);
     
     float lightIntensity = 10.f, lightRadius = 20;
     
     float timeBase = static_cast<float>(glfwGetTime());
     
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(context.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
     complex.scale(Empty::math::vec4(10, 6, 10, 10)).pos(1) = 3;
     
@@ -334,33 +387,34 @@ int _main(int, char *argv[])
         objectIndex++;
     });
     
-    svComputer.reinit(display_w, display_h, *texPos, cellsCompBuffer, objIndexCompBuffer, vertexCompBuffer);
+    svComputer.reinit(context.frameWidth, context.frameHeight, *texPos, cellsCompBuffer, objIndexCompBuffer, vertexCompBuffer);
     
     /// Start draw loop
     {
-        int mwgcx, mwgcy, mwgcz, msms;
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &mwgcx);
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &mwgcy);
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &mwgcz);
-        glGetIntegerv(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE, &msms);
+        using namespace Empty::gl;
+        int mwgcx = context.getStateVar<ContextStateVar::MaxComputeWorkGroupCount>(0),
+            mwgcy = context.getStateVar<ContextStateVar::MaxComputeWorkGroupCount>(1),
+            mwgcz = context.getStateVar<ContextStateVar::MaxComputeWorkGroupCount>(2),
+            msms = context.getStateVar<ContextStateVar::MaxComputeSharedMemorySize>();
         trace("GPU allows for a maximum of (" << mwgcx << ", " << mwgcy << ", " << mwgcz << ") work groups");
         trace("GPU allows for " << msms << " bytes of shared memory");
     }
     
-    setupDeferred(display_w, display_h);
+    setupDeferred(context.frameWidth, context.frameHeight);
     
     glClearColor(0, 0, 0, 1);
     
     trace("Entering drawing loop");
     
-    while (!glfwWindowShouldClose(window))
+    setAspectRatio(p, (float)context.frameWidth / context.frameHeight);
+    
+    while (!glfwWindowShouldClose(context.window))
     {
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        setAspectRatio(p, (float)display_w / display_h);
-        
+        context.newFrame();
+
         /// Render scene on framebuffer for deferred shading
         glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-        glViewport(0, 0, display_w, display_h);
+        context.setViewport(context.frameWidth, context.frameHeight);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         float now = static_cast<float>(glfwGetTime()), dt = now - timeBase;
@@ -397,7 +451,7 @@ int _main(int, char *argv[])
         // Bind textures and whatnot
         glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
         computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
-        computeProgram.uniform2i("uTexSize", display_w, display_h);
+        computeProgram.uniform2i("uTexSize", context.frameWidth, context.frameHeight);
         computeProgram.uniformMatrix4fv("V", 1, vt.mat);
         computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
         // Perform the actual computation
@@ -405,19 +459,15 @@ int _main(int, char *argv[])
         
         /// Deferred rendering
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, display_w, display_h);
+        context.setViewport(context.frameWidth, context.frameHeight);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         quadProgram.use();
         quadProgram.uniform1f("uLightIntensity", lightIntensity);
         quadProgram.uniform1f("uLightRadius", lightRadius);
         quadProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
-        quadProgram.uniform2i("uTexSize", display_w, display_h);
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        quadProgram.uniform2i("uTexSize", context.frameWidth, context.frameHeight);
+        context.memoryBarrier(Empty::gl::MemoryBarrierType::ShaderStorage);
         quadRC.render();
-        
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
         
         ImGui::Begin("Test parameters", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             if(ImGui::TreeNode("Lighting parameters"))
@@ -429,8 +479,8 @@ int _main(int, char *argv[])
             if(ImGui::TreeNode("Camera control"))
             {
                 ImGui::SliderFloat("Movement speed", &camera.speed, 1, 10);
-                ImGui::SliderFloat("Rotation divisor X", &camera.rotationDivisorX, 1, (float)display_w);
-                ImGui::SliderFloat("Rotation divisor Y", &camera.rotationDivisorY, 1, (float)display_h);
+                ImGui::SliderFloat("Rotation divisor X", &camera.rotationDivisorX, 1, (float)context.frameWidth);
+                ImGui::SliderFloat("Rotation divisor Y", &camera.rotationDivisorY, 1, (float)context.frameHeight);
                 ImGui::SliderFloat("XW+ZW rotation speed", &camera.xwzwSpeed, 0.1f, (float)M_PI * 2.f);
                 ImGui::TreePop();
             }
@@ -443,10 +493,8 @@ int _main(int, char *argv[])
             ImGui::Text("Camera rotation : %lf, %lf, %lf", camera._xz, camera._yz, camera._xwzw);
         ImGui::End();
                 
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+        context.swap();
+
         if(!freezeCamera)
             camera.update(dt);
     }
@@ -455,11 +503,9 @@ int _main(int, char *argv[])
     glDeleteFramebuffers(1, &gBuffer);
     
     trace("Exiting drawing loop");
+    
     // Cleanup
-    ImGui_ImplGlfw_Shutdown();
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui::DestroyContext();
-    glfwTerminate();
+    context.terminate();
     
     return 0;
 }
