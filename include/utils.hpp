@@ -46,12 +46,6 @@ GLuint createShaderFromSource(GLenum type, const std::string &path);
 void printShaderLog(GLuint shader);
 
 /**
- * Prints all available OpenGL error codes.
- */
-#define checkGLerror() _checkGLerror(__FILE__, __LINE__)
-void _checkGLerror(const char *file, int line);
-
-/**
  * Prints data to std::cerr. Use the operator<< notation to print sequentially.
  */
 #define trace(s) std::cerr << __FILE__ << ":" << __LINE__ << " : " << s << std::endl

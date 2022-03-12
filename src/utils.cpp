@@ -68,17 +68,6 @@ void printShaderLog(GLuint shader)
         std::cerr << "Shader #" << shader << " has no log" << std::endl;
 }
 
-void _checkGLerror(const char *file, int line)
-{
-    GLenum erro = glGetError();
-    std::cerr << file << ":" << line << " : 0x" << std::hex;
-    do
-    {
-        std::cerr << erro << " ";
-    } while ((erro = glGetError()));
-    std::cerr << std::dec << std::endl;
-}
-
 // Expects an identity matrix as input
 void perspective(Empty::math::mat4 &p, float fov, float ratio, float near, float far)
 {
