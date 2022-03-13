@@ -6,6 +6,7 @@ project(Escher4D LANGUAGES C CXX)
 
 set(SOURCES ${SOURCES}
     include/Camera4.hpp
+    include/Context.h
     include/FSQuadRenderContext.hpp
     include/Geometry4.hpp
     include/HierarchicalBuffer.hpp
