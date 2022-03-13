@@ -6,27 +6,18 @@
 #include <numeric>
 #include <vector>
 
+#include <Empty/gl/Buffer.h>
 #include <Empty/math/funcs.h>
 
 #include "MathUtil.hpp"
 #include "ShaderProgram.hpp"
 #include "utils.hpp"
 
-enum
-{
-    VERTEX_ARRAY_BUFFER = 0,
-    ELEMENT_ARRAY_BUFFER,
-    ARRAY_BUFFERS
-};
-
 /**
  * Handles 4D geometry on the CPU and GPU side.
  */
 struct Geometry4
 {
-    Geometry4() { glGenBuffers(ARRAY_BUFFERS, _vbos); }
-    ~Geometry4() { glDeleteBuffers(ARRAY_BUFFERS, _vbos); }
-    
     /**
      * Constructs a 4D geometry by promoting 3D vertices to 4D by adding an extra 0.
      * This does not compute normal vectors automatically !
@@ -209,15 +200,11 @@ struct Geometry4
     {
         size_t v = vertices.size() * sizeof(Empty::math::vec4),
             e = cells.size() * sizeof(unsigned int);
-        glBindBuffer(GL_ARRAY_BUFFER, _vbos[VERTEX_ARRAY_BUFFER]);
-        glBufferData(GL_ARRAY_BUFFER, v * 2, NULL, GL_STATIC_DRAW);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, v, &vertices[0]);
-        glBufferSubData(GL_ARRAY_BUFFER, v, v, &normals[0]);
+        _vbo.setStorage(v * 2, Empty::gl::BufferUsage::StaticDraw);
+        _vbo.uploadData(0, v, vertices[0]);
+        _vbo.uploadData(v, v, normals[0]);
         if(e > 0)
-        {
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _vbos[ELEMENT_ARRAY_BUFFER]);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, e, &cells[0], GL_STATIC_DRAW);
-        }
+            _ebo.setStorage(e, Empty::gl::BufferUsage::StaticDraw, &cells[0]);
     }
     
     /**
@@ -225,8 +212,8 @@ struct Geometry4
      */
     void exposeGPU(ShaderProgram &program)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, _vbos[VERTEX_ARRAY_BUFFER]);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _vbos[ELEMENT_ARRAY_BUFFER]);
+        glBindBuffer(GL_ARRAY_BUFFER, _vbo.getInfo());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo.getInfo());
         program.vertexAttribPointer("aPosition", 4, GL_FLOAT, sizeof(Empty::math::vec4), 0);
         program.vertexAttribPointer("aNormal", 4, GL_FLOAT, sizeof(Empty::math::vec4),
             vertices.size() * sizeof(Empty::math::vec4));
@@ -254,7 +241,7 @@ struct Geometry4
      */
     std::vector<Empty::math::vec4> normals;
 private:
-    GLuint _vbos[ARRAY_BUFFERS];
+    Empty::gl::Buffer _vbo, _ebo;
 };
 
 #endif

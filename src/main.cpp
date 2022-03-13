@@ -14,10 +14,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <Empty/Context.hpp>
+#include <Empty/gl/Framebuffer.h>
+#include <Empty/gl/Renderbuffer.h>
 #include <Empty/math/vec.h>
 #include <Empty/math/mat.h>
-#include <Empty/gl/ShaderProgram.hpp>
-#include <Empty/gl/Texture.h>
 
 #include "Camera4.hpp"
 #include "FSQuadRenderContext.hpp"
@@ -27,81 +27,6 @@
 #include "ShaderProgram.hpp"
 #include "ShadowHypervolumes.hpp"
 #include "utils.hpp"
-
-static void glfw_error_callback(int error, const char *description)
-{
-    trace("Error " << error << " : " << description);
-}
-
-static bool freezeCamera = false;
-static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
-{
-    ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
-    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-    {
-        freezeCamera = !freezeCamera;
-        glfwSetInputMode(window, GLFW_CURSOR, freezeCamera ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
-    }
-};
-
-static void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
-{
-    ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-}
-
-// Deferred rendering buffers and textures
-static GLuint gBuffer, dBuffer;
-static Texture *texPos, *texNorm, *texColor;
-
-/**
- * Sets up internals (framebuffer and textures) for deferred rendering given
- * framebuffer dimensions.
- */
-void setupDeferred(int w, int h)
-{
-    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-    
-    glBindTexture(GL_TEXTURE_2D, texPos->id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texPos->id, 0);
-    
-    glBindTexture(GL_TEXTURE_2D, texNorm->id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8_SNORM, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texNorm->id, 0);
-    
-    glBindTexture(GL_TEXTURE_2D, texColor->id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texColor->id, 0);
-    
-    const static unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
-        GL_COLOR_ATTACHMENT2 };
-    glDrawBuffers(3, attachments);
-    
-    glBindRenderbuffer(GL_RENDERBUFFER, dBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, dBuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-static void framebufferSizeCallback(GLFWwindow*, int width, int height)
-{
-    setupDeferred(width, height);
-}
-
-static void printGLerror(Empty::gl::DebugMessageSource, Empty::gl::DebugMessageType type, Empty::gl::DebugMessageSeverity severity, int,
-    const std::string& message, const void*)
-{
-    std::cerr << "GL " << Empty::utils::name(type) << " (" << Empty::utils::name(severity) << ") : "
-        << message << std::endl;
-}
 
 struct Context : public Empty::Context, Empty::utils::noncopyable
 {
@@ -155,9 +80,52 @@ struct Context : public Empty::Context, Empty::utils::noncopyable
         frameWidth = w;
         frameHeight = h;
 
+        /// Create context resources
+        gBuffer = std::make_unique<Empty::gl::Framebuffer>();
+        dBuffer = std::make_unique<Empty::gl::Renderbuffer>();
+
         _init = true;
         return true;
     }
+
+    /**
+     * Sets up internals (framebuffer and textures) for deferred rendering given
+     * framebuffer dimensions.
+     */
+    void setupDeferred(int w, int h)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer->getInfo());
+
+        glBindTexture(GL_TEXTURE_2D, texPos->id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texPos->id, 0);
+
+        glBindTexture(GL_TEXTURE_2D, texNorm->id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8_SNORM, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texNorm->id, 0);
+
+        glBindTexture(GL_TEXTURE_2D, texColor->id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texColor->id, 0);
+
+        const static unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
+            GL_COLOR_ATTACHMENT2 };
+        glDrawBuffers(3, attachments);
+
+        glBindRenderbuffer(GL_RENDERBUFFER, dBuffer->getInfo());
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, dBuffer->getInfo());
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
 
     void newFrame() const
     {
@@ -188,11 +156,43 @@ struct Context : public Empty::Context, Empty::utils::noncopyable
 
     int frameWidth, frameHeight;
     GLFWwindow* window;
+    bool freezeCamera = false;
+    // Deferred rendering buffers and textures
+    std::unique_ptr<Empty::gl::Framebuffer> gBuffer;
+    std::unique_ptr<Empty::gl::Renderbuffer> dBuffer;
+    Texture* texPos, * texNorm, * texColor;
 
 private:
     Context() : Empty::Context(), Empty::utils::noncopyable(), frameWidth(0), frameHeight(0), window(nullptr), _init(false) { }
     bool _init;
     static Context _instance;
+
+    // Callbacks
+    static void glfw_error_callback(int error, const char* description)
+    {
+        trace("Error " << error << " : " << description);
+    }
+
+    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+    {
+        Context& context = Context::get();
+        ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        {
+            context.freezeCamera = !context.freezeCamera;
+            glfwSetInputMode(window, GLFW_CURSOR, context.freezeCamera ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+        }
+    };
+
+    static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+    {
+        ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+    }
+
+    static void framebufferSizeCallback(GLFWwindow*, int width, int height)
+    {
+        Context::get().setupDeferred(width, height);
+    }
 };
 
 Context Context::_instance;
@@ -201,6 +201,13 @@ Context Context::_instance;
 void complexDemo(Object4&);
 
 Object4 Object4::scene;
+
+static void printGLerror(Empty::gl::DebugMessageSource, Empty::gl::DebugMessageType type, Empty::gl::DebugMessageSeverity severity, int,
+                         const std::string& message, const void*)
+{
+    std::cerr << "GL " << Empty::utils::name(type) << " (" << Empty::utils::name(severity) << ") : "
+        << message << std::endl;
+}
 
 int _main(int, char *argv[])
 {
@@ -335,12 +342,9 @@ int _main(int, char *argv[])
     ShaderProgram quadProgram;
     quadProgram.attach(GL_VERTEX_SHADER, "shaders/deferred_vert.glsl");
     quadProgram.attach(GL_FRAGMENT_SHADER, "shaders/deferred_frag.glsl");
-    texPos = &quadProgram.getTexture("texPos");
-    texNorm = &quadProgram.getTexture("texNorm");
-    texColor = &quadProgram.getTexture("texColor");
-    
-    glGenFramebuffers(1, &gBuffer);
-    glGenRenderbuffers(1, &dBuffer);
+    context.texPos = &quadProgram.getTexture("texPos");
+    context.texNorm = &quadProgram.getTexture("texNorm");
+    context.texColor = &quadProgram.getTexture("texColor");
     
     FSQuadRenderContext quadRC(quadProgram);
     
@@ -387,7 +391,7 @@ int _main(int, char *argv[])
         objectIndex++;
     });
     
-    svComputer.reinit(context.frameWidth, context.frameHeight, *texPos, cellsCompBuffer, objIndexCompBuffer, vertexCompBuffer);
+    svComputer.reinit(context.frameWidth, context.frameHeight, *context.texPos, cellsCompBuffer, objIndexCompBuffer, vertexCompBuffer);
     
     /// Start draw loop
     {
@@ -400,7 +404,7 @@ int _main(int, char *argv[])
         trace("GPU allows for " << msms << " bytes of shared memory");
     }
     
-    setupDeferred(context.frameWidth, context.frameHeight);
+    context.setupDeferred(context.frameWidth, context.frameHeight);
     
     glClearColor(0, 0, 0, 1);
     
@@ -413,7 +417,7 @@ int _main(int, char *argv[])
         context.newFrame();
 
         /// Render scene on framebuffer for deferred shading
-        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, context.gBuffer->getInfo());
         context.setViewport(context.frameWidth, context.frameHeight);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
@@ -449,7 +453,7 @@ int _main(int, char *argv[])
         }
         
         // Bind textures and whatnot
-        glBindImageTexture(0, texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+        glBindImageTexture(0, context.texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
         computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
         computeProgram.uniform2i("uTexSize", context.frameWidth, context.frameHeight);
         computeProgram.uniformMatrix4fv("V", 1, vt.mat);
@@ -495,12 +499,9 @@ int _main(int, char *argv[])
                 
         context.swap();
 
-        if(!freezeCamera)
+        if(!context.freezeCamera)
             camera.update(dt);
     }
-    
-    glDeleteRenderbuffers(1, &dBuffer);
-    glDeleteFramebuffers(1, &gBuffer);
     
     trace("Exiting drawing loop");
     

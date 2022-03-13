@@ -11,16 +11,11 @@ using namespace Empty::math;
 
 vec4 MathUtil::cross4(const vec4 &v1, const vec4 &v2, const vec4 &v3)
 {
-    static auto xyz = [](const vec4 &v) { return vec3(v(0), v(1), v(2)); };
-    static auto xyw = [](const vec4 &v) { return vec3(v(0), v(1), v(3)); };
-    static auto xzw = [](const vec4 &v) { return vec3(v(0), v(2), v(3)); };
-    static auto yzw = [](const vec4 &v) { return vec3(v(1), v(2), v(3)); };
-    
     vec4 v;
-    v(0) = dot(yzw(v3), cross(yzw(v1), yzw(v2)));
-    v(1) = -dot(xzw(v3), cross(xzw(v1), xzw(v2)));
-    v(2) = dot(xyw(v3),cross(xyw(v1), xyw(v2)));
-    v(3) = -dot(xyz(v3), cross(xyz(v1), xyz(v2)));
+    v.x = dot(v3.yzw(), cross(v1.yzw(), v2.yzw()));
+    v.y = -dot(v3.xzw(), cross(v1.xzw(), v2.xzw()));
+    v.z = dot(v3.xyw(),cross(v1.xyw(), v2.xyw()));
+    v.w = -dot(v3.xyz(), cross(v1.xyz(), v2.xyz()));
     return v;
 }
 
