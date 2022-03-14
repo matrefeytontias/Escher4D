@@ -74,7 +74,8 @@ int _main(int, char *argv[])
     Geometry4 cubeGeometry, holedGeometry;
     {
         std::vector<Empty::math::vec3> vertices;
-        std::vector<unsigned int> tris, tetras;
+        std::vector<Empty::math::uvec3> tris;
+        std::vector<Empty::math::uvec4> tetras;
         // Cube
         if(!OFFLoader::loadModel("models/cube", vertices, tris, tetras))
         {
@@ -155,7 +156,7 @@ int _main(int, char *argv[])
         const Model4RenderContext *rc = obj.getRenderContext();
         if(rc)
         {
-            tetrahedra += static_cast<int>(rc->geometry.isIndexed() ? rc->geometry.cells.size() / 4
+            tetrahedra += static_cast<int>(rc->geometry.isIndexed() ? rc->geometry.cells.size()
                 : rc->geometry.vertices.size() / 4);
         }
     });
@@ -183,8 +184,8 @@ int _main(int, char *argv[])
     /// Setup shadow hypervolumes computations
     ShadowHypervolumes svComputer;
     
-    std::vector<int> cellsCompBuffer; // ivec4
-    std::vector<int> objIndexCompBuffer; // int
+    std::vector<Empty::math::uvec4> cellsCompBuffer; // uvec4
+    std::vector<unsigned int> objIndexCompBuffer; // uint
     std::vector<Empty::math::vec4> vertexCompBuffer; // vec4
     std::vector<Empty::math::mat4> MCompBuffer; // mat4
     std::vector<Empty::math::vec4> MtCompBuffer; // vec4
@@ -201,20 +202,19 @@ int _main(int, char *argv[])
                 const int vertexCount = static_cast<int>(vertexCompBuffer.size());
                 if(geom.isIndexed())
                 {
-                    for(unsigned int k = 0; k < geom.cells.size(); k++)
+                    for(const auto& cell : geom.cells)
                     {
-                        cellsCompBuffer.push_back(geom.cells[k] + vertexCount);
-                        if(!(k % 4))
-                            objIndexCompBuffer.push_back(objectIndex);
+                        cellsCompBuffer.push_back(cell + vertexCount);
+                        objIndexCompBuffer.push_back(objectIndex);
                     }
                 }
                 else
                 {
-                    for(unsigned int k = 0; k < geom.vertices.size(); k++)
+                    for(unsigned int k = 0; k < geom.vertices.size(); k += 4)
                     {
-                        cellsCompBuffer.push_back(k + vertexCount);
-                        if(!(k % 4))
-                            objIndexCompBuffer.push_back(objectIndex);
+                        unsigned int v = k + vertexCount;
+                        cellsCompBuffer.push_back({ v, v + 1, v + 2, v + 3 });
+                        objIndexCompBuffer.push_back(objectIndex);
                     }
                 }
                 vertexCompBuffer.insert(vertexCompBuffer.end(), geom.vertices.begin(), geom.vertices.end());

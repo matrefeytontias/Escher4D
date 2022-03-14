@@ -11,7 +11,7 @@ void Model4RenderContext::render()
 {
     geometry.exposeGPU(_program);
     if(geometry.isIndexed())
-        glDrawElements(GL_LINES_ADJACENCY, geometry.cells.size(), GL_UNSIGNED_INT, NULL);
+        glDrawElements(GL_LINES_ADJACENCY, static_cast<int>(geometry.cells.size() * 4), GL_UNSIGNED_INT, NULL);
     else
-        glDrawArrays(GL_LINES_ADJACENCY, 0, geometry.vertices.size());
+        glDrawArrays(GL_LINES_ADJACENCY, 0, static_cast<int>(geometry.vertices.size()));
 }

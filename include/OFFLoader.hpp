@@ -21,7 +21,7 @@ namespace OFFLoader
  * @return  whether or not the operation succeeded
  */
 bool loadModel(const string &baseName, std::vector<Empty::math::vec3> &v,
-    std::vector<unsigned int> &tris, std::vector<unsigned int> &tetras)
+    std::vector<Empty::math::uvec3> &tris, std::vector<Empty::math::uvec4> &tetras)
 {
     try
     {
@@ -33,35 +33,35 @@ bool loadModel(const string &baseName, std::vector<Empty::math::vec3> &v,
         if(offFile[0] != "OFF")
             return false;
         size_t nb = stoi(offFile[1]); // grab the first integer
-        v.resize(nb, Empty::math::vec3(0, 0, 0));
+        v.resize(nb);
 
         for(size_t i = 0; i < nb; i++)
         {
             std::vector<string> vertex = split(offFile[i + 2], " \t");
-            v[i](0) = stof(vertex[0]);
-            v[i](1) = stof(vertex[1]);
-            v[i](2) = stof(vertex[2]);
+            v[i].x = stof(vertex[0]);
+            v[i].y = stof(vertex[1]);
+            v[i].z = stof(vertex[2]);
         }
         // Read triangles
         nb = stoi(faceFile[0]);
-        tris.resize(nb * 3);
+        tris.resize(nb);
         for(size_t i = 0; i < nb; i++)
         {
             std::vector<string> tri = split(faceFile[i + 1], " \t");
-            tris[i * 3] = stoi(tri[1]);
-            tris[i * 3 + 1] = stoi(tri[2]);
-            tris[i * 3 + 2] = stoi(tri[3]);
+            tris[i].x = stoi(tri[1]);
+            tris[i].y = stoi(tri[2]);
+            tris[i].z = stoi(tri[3]);
         }
         // Read tetrahedra
         nb = stoi(tetraFile[0]);
-        tetras.resize(nb * 4);
+        tetras.resize(nb);
         for(size_t i = 0; i < nb; i++)
         {
             std::vector<string> tetra = split(tetraFile[i + 1], " \t");
-            tetras[i * 4] = stoi(tetra[1]);
-            tetras[i * 4 + 1] = stoi(tetra[2]);
-            tetras[i * 4 + 2] = stoi(tetra[3]);
-            tetras[i * 4 + 3] = stoi(tetra[4]);
+            tetras[i].x = stoi(tetra[1]);
+            tetras[i].y = stoi(tetra[2]);
+            tetras[i].z = stoi(tetra[3]);
+            tetras[i].w = stoi(tetra[4]);
         }
         
         return true;

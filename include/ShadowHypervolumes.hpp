@@ -33,14 +33,14 @@ public:
      * Re-initializes the state of the shadow volumes computer. Call this when changing
      * screen dimensions, shadow-casting tetrahedra or vertices.
      */
-    void reinit(int w, int h, Texture &texPos, std::vector<int> &cells, std::vector<int> &objIndices, std::vector<Empty::math::vec4> &vertices)
+    void reinit(int w, int h, Texture &texPos, std::vector<Empty::math::uvec4> &cells, std::vector<unsigned int> &objIndices, std::vector<Empty::math::vec4> &vertices)
     {
         _w = w;
         _h = h;
-        _cellsAmount = static_cast<int>(cells.size() / 4);
-        _cellBuf.setStorage(cells.size() * sizeof(int), Empty::gl::BufferUsage::StaticDraw, &cells[0]);
-        _objIDBuf.setStorage(objIndices.size() * sizeof(int), Empty::gl::BufferUsage::StaticDraw, &objIndices[0]);
-        _vertexBuf.setStorage(vertices.size() * sizeof(Empty::math::vec4), Empty::gl::BufferUsage::StaticDraw, vertices[0]);
+        _cellsAmount = static_cast<int>(cells.size());
+        _cellBuf.setStorage(cells.size() * sizeof(cells[0]), Empty::gl::BufferUsage::StaticDraw, cells[0]);
+        _objIDBuf.setStorage(objIndices.size() * sizeof(objIndices[0]), Empty::gl::BufferUsage::StaticDraw, &objIndices[0]);
+        _vertexBuf.setStorage(vertices.size() * sizeof(vertices[0]), Empty::gl::BufferUsage::StaticDraw, vertices[0]);
         // AABB hierarchy has 4 * 2 floats per pixel
         _aabbBuf.setStorage(BUFFER_SIZE * 4 * 2 * sizeof(float), Empty::gl::BufferUsage::DynamicCopy);
         // Shadow hierarchy has 1 bit per pixel but OpenGL needs ints, so divide the size by 32

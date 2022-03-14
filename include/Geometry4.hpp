@@ -24,7 +24,7 @@ struct Geometry4
      * @param   v3      array of 3D vertices
      * @param   tetras  array of tetrahedron indices
      */
-    void from3D(const std::vector<Empty::math::vec3> &v3, const std::vector<unsigned int> &tetras)
+    void from3D(const std::vector<Empty::math::vec3> &v3, const std::vector<Empty::math::uvec4> &tetras)
     {
         vertices.clear();
         for(const Empty::math::vec3 &v : v3)
@@ -40,32 +40,32 @@ struct Geometry4
      * @param   tetras  array of tetrahedron indices
      * @param   duth    amount of extrusion along the W axis
      */
-    void from3D(const std::vector<Empty::math::vec3> &v3, const std::vector<unsigned int> &tris,
-        const std::vector<unsigned int> &tetras, float duth)
+    void from3D(const std::vector<Empty::math::vec3> &v3, const std::vector<Empty::math::uvec3> &tris,
+        const std::vector<Empty::math::uvec4> &tetras, float duth)
     {
         vertices.clear();
         int base = static_cast<int>(v3.size());
         float d = duth / 2;
         
-        for(const Empty::math::vec3 &v : v3)
+        for(const auto &v : v3)
         {
-            Empty::math::vec4 v4(v(0), v(1), v(2), -d);
+            Empty::math::vec4 v4(v, -d);
             vertices.push_back(v4);
         }
         
         cells.insert(cells.begin(), tetras.begin(), tetras.end());
-        for(int t : tetras)
+        for(const auto &t : tetras)
             cells.push_back(t + base);
         
-        for(const Empty::math::vec3 &v : v3)
+        for(const auto &v : v3)
         {
-            Empty::math::vec4 v4(v(0), v(1), v(2), d);
+            Empty::math::vec4 v4(v, d);
             vertices.push_back(v4);
         }
         
-        for(size_t k = 0; k < tris.size(); k += 3)
+        for(const auto& tri : tris)
         {
-            int a = tris[k], b = tris[k + 1], c = tris[k + 2],
+            int a = tri.x, b = tri.y, c = tri.z,
                 d = a + base, e = b + base, f = c + base;
             pushCell(a, c, e, d);
             pushCell(b, e, c, a);
@@ -80,23 +80,21 @@ struct Geometry4
      */
     void recomputeNormals(bool inwards = false)
     {
-        static Empty::math::vec4 zero = Empty::math::vec4(0, 0, 0, 0);
+        Empty::math::vec4 checker = Empty::math::vec4::zero;
         normals.clear();
         
         // If the mesh is indexed, use solid angle weighting
         if(cells.size() > 0)
         {
-            normals.resize(vertices.size(), zero);
-            for(unsigned int c = 0; c < cells.size(); c += 4)
+            normals.resize(vertices.size(), Empty::math::vec4::zero);
+            for(auto &cell : cells)
             {
-                unsigned int *cell = &cells[c];
-                Empty::math::vec4 cellN = MathUtil::cross4(vertices[cell[1]] - vertices[cell[0]], vertices[cell[2]] - vertices[cell[0]],
+                auto cellN = MathUtil::cross4(vertices[cell[1]] - vertices[cell[0]], vertices[cell[2]] - vertices[cell[0]],
                     vertices[cell[3]] - vertices[cell[0]]);
                 float paraVolume = Empty::math::length(cellN);
                 auto sdist = [&](int i, int j) { auto r = (vertices[cell[i % 4]] - vertices[cell[j % 4]]); return Empty::math::dot(r, r); };
                 
                 // Skeleton checking for normal std::vector orientation
-                Empty::math::vec4 &checker = zero;
                 if(skeleton.size() > 0)
                     checker = *MathUtil::nearestPoint(vertices[cell[0]], skeleton);
                 if((Empty::math::dot(cellN, vertices[cell[0]] - checker) < 0) != inwards)
@@ -127,7 +125,6 @@ struct Geometry4
                     vertices[i + 3] - vertices[i]);
                 
                 // Skeleton checking for normal std::vector orientation
-                Empty::math::vec4 &checker = zero;
                 if(skeleton.size() > 0)
                     checker = *MathUtil::nearestPoint(vertices[i], skeleton);
                 if((Empty::math::dot(n, vertices[i] - checker) < 0) != inwards)
@@ -152,7 +149,7 @@ struct Geometry4
      */
     Empty::math::vec4 barycenter() const
     {
-        return std::accumulate(vertices.begin(), vertices.end(), Empty::math::vec4(0, 0, 0, 0)) / static_cast<float>(vertices.size());
+        return std::accumulate(vertices.begin(), vertices.end(), Empty::math::vec4::zero) / static_cast<float>(vertices.size());
     }
     
     /**
@@ -161,7 +158,7 @@ struct Geometry4
     void boundingBox(Empty::math::vec4 &min, Empty::math::vec4 &max) const
     {
         min = max = vertices[0];
-        for(const Empty::math::vec4 &v : vertices)
+        for(const auto &v : vertices)
         {
             min = Empty::math::min(v, min);
             max = Empty::math::max(v, max);
@@ -175,8 +172,9 @@ struct Geometry4
     void unindex()
     {
         std::vector<Empty::math::vec4> newv;
-        for(unsigned int i : cells)
-            newv.push_back(vertices[i]);
+        for(const auto& cell : cells)
+            for(unsigned int i = 0; i < 4; i++)
+                newv.push_back(vertices[cell[i]]);
         vertices.assign(newv.begin(), newv.end());
         cells.clear();
     }
@@ -184,12 +182,9 @@ struct Geometry4
     /**
      * Convenience function to push 4 integers to the cells array.
      */
-    inline void pushCell(int a, int b, int c, int d)
+    inline void pushCell(unsigned int a, unsigned int b, unsigned int c, unsigned int d)
     {
-        cells.push_back(a);
-        cells.push_back(b);
-        cells.push_back(c);
-        cells.push_back(d);
+        cells.push_back({ a, b, c, d });
     }
     
     /**
@@ -198,13 +193,13 @@ struct Geometry4
      */
     void uploadGPU()
     {
-        size_t v = vertices.size() * sizeof(Empty::math::vec4),
-            e = cells.size() * sizeof(unsigned int);
+        size_t v = vertices.size() * sizeof(vertices[0]),
+            e = cells.size() * sizeof(cells[0]);
         _vbo.setStorage(v * 2, Empty::gl::BufferUsage::StaticDraw);
         _vbo.uploadData(0, v, vertices[0]);
         _vbo.uploadData(v, v, normals[0]);
         if(e > 0)
-            _ebo.setStorage(e, Empty::gl::BufferUsage::StaticDraw, &cells[0]);
+            _ebo.setStorage(e, Empty::gl::BufferUsage::StaticDraw, cells[0]);
     }
     
     /**
@@ -213,10 +208,11 @@ struct Geometry4
     void exposeGPU(ShaderProgram &program)
     {
         glBindBuffer(GL_ARRAY_BUFFER, _vbo.getInfo());
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo.getInfo());
+        if(isIndexed())
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo.getInfo());
         program.vertexAttribPointer("aPosition", 4, GL_FLOAT, sizeof(Empty::math::vec4), 0);
-        program.vertexAttribPointer("aNormal", 4, GL_FLOAT, sizeof(Empty::math::vec4),
-            vertices.size() * sizeof(Empty::math::vec4));
+        program.vertexAttribPointer("aNormal", 4, GL_FLOAT, static_cast<int>(sizeof(Empty::math::vec4)),
+            static_cast<int>(vertices.size() * sizeof(Empty::math::vec4)));
     }
     
     /**
@@ -235,7 +231,7 @@ struct Geometry4
     /**
      * Cell indices. Cells are tetrahedra living in 4-space.
      */
-    std::vector<unsigned int> cells;
+    std::vector<Empty::math::uvec4> cells;
     /**
      * Normal vectors at every vertex. This is not automatically recomputed !
      */
