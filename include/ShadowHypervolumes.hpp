@@ -8,6 +8,7 @@
 #include <Empty/math/mat.h>
 #include <GLFW/glfw3.h>
 
+#include "Context.h"
 #include "ShaderProgram.hpp"
 
 /**
@@ -54,18 +55,16 @@ public:
      */
     ShaderProgram &precompute()
     {
+        Context& context = Context::get();
+
         _aabbProgram.use();
         _aabbProgram.uniform2i("uTexSize", _w, _h);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, _aabbBuf.getInfo());
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        glDispatchCompute((_w + 7) / 8, (_h  + 3) / 4, 1);
+        context.bind(_aabbBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 5);
+        context.memoryBarrier(Empty::gl::MemoryBarrierType::ShaderStorage);
+        context.dispatchCompute((_w + 7) / 8, (_h  + 3) / 4, 1);
         
         // Clear shadow hierarchy
-        {
-            unsigned int bleh = 0;
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, _shadowBuf.getInfo());
-            glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED, GL_UNSIGNED_INT, &bleh);
-        }
+        _shadowBuf.clearData<Empty::gl::DataFormat::Red, Empty::gl::DataType::UInt>(Empty::gl::BufferDataFormat::Red32ui, 0);
         
         _computeProgram.use();
         return _computeProgram;
@@ -77,22 +76,24 @@ public:
      */
     void compute(std::vector<Empty::math::mat4> &ms, std::vector<Empty::math::vec4> &ts)
     {
+        Context& context = Context::get();
+
         // For good measure
         _computeProgram.use();
         
         _matBuf.setStorage(ms.size() * sizeof(Empty::math::mat4), Empty::gl::BufferUsage::StreamDraw, ms[0]);
         _tBuf.setStorage(ts.size() * sizeof(Empty::math::vec4), Empty::gl::BufferUsage::StreamDraw, ts[0]);
         
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, _cellBuf.getInfo());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _objIDBuf.getInfo());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, _vertexBuf.getInfo());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, _matBuf.getInfo());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, _tBuf.getInfo());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, _aabbBuf.getInfo());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, _shadowBuf.getInfo());
+        context.bind(_cellBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 0);
+        context.bind(_objIDBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 1);
+        context.bind(_vertexBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 2);
+        context.bind(_matBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 3);
+        context.bind(_tBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 4);
+        context.bind(_aabbBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 5);
+        context.bind(_shadowBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 6);
         
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        glDispatchCompute(_cellsAmount, 1, 1);
+        context.memoryBarrier(Empty::gl::MemoryBarrierType::ShaderStorage);
+        context.dispatchCompute(_cellsAmount, 1, 1);
     }
 
 private:

@@ -238,8 +238,6 @@ int _main(int, char *argv[])
     
     context.setupDeferred(context.frameWidth, context.frameHeight);
     
-    glClearColor(0, 0, 0, 1);
-    
     trace("Entering drawing loop");
     
     setAspectRatio(p, (float)context.frameWidth / context.frameHeight);
@@ -249,9 +247,9 @@ int _main(int, char *argv[])
         context.newFrame();
 
         /// Render scene on framebuffer for deferred shading
-        glBindFramebuffer(GL_FRAMEBUFFER, context.gBuffer->getInfo());
-        context.setViewport(context.frameWidth, context.frameHeight);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        context.setFramebuffer(*context.gBuffer, Empty::gl::FramebufferTarget::DrawRead, context.frameWidth, context.frameHeight);
+        context.gBuffer->clearAttachment<Empty::gl::FramebufferAttachment::Color>(0, Empty::math::vec4::zero);
+        context.gBuffer->clearAttachment<Empty::gl::FramebufferAttachment::Depth>(1.f);
         
         float now = static_cast<float>(glfwGetTime()), dt = now - timeBase;
         timeBase = now;
@@ -294,9 +292,9 @@ int _main(int, char *argv[])
         svComputer.compute(MCompBuffer, MtCompBuffer);
         
         /// Deferred rendering
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        context.setViewport(context.frameWidth, context.frameHeight);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        context.setFramebuffer(Empty::gl::Framebuffer::dflt, Empty::gl::FramebufferTarget::DrawRead, context.frameWidth, context.frameHeight);
+        Empty::gl::Framebuffer::dflt.clearAttachment<Empty::gl::FramebufferAttachment::Color>(0, Empty::math::vec4::zero);
+        Empty::gl::Framebuffer::dflt.clearAttachment<Empty::gl::FramebufferAttachment::Depth>(1.f);
         quadProgram.use();
         quadProgram.uniform1f("uLightIntensity", lightIntensity);
         quadProgram.uniform1f("uLightRadius", lightRadius);

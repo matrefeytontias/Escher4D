@@ -1,6 +1,7 @@
 #ifndef INC_FSQUAD_RENDER_CONTEXT
 #define INC_FSQUAD_RENDER_CONTEXT
 
+#include "Context.h"
 #include "RenderContext.hpp"
 #include "utils.hpp"
 
@@ -35,9 +36,10 @@ public:
     
     virtual void render() override
     {
-        glBindBuffer(GL_ARRAY_BUFFER, _vbo.getInfo());
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo.getInfo());
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
+        Context& context = Context::get();
+        context.bind(_vbo, Empty::gl::BufferTarget::Array);
+        context.bind(_ebo, Empty::gl::BufferTarget::ElementArray);
+        context.drawElements(Empty::gl::PrimitiveType::Triangles, Empty::gl::ElementType::Int, 0, 6);
     }
 protected:
     Empty::gl::Buffer _vbo, _ebo;

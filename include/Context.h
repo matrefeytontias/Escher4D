@@ -99,16 +99,10 @@ struct Context : public Empty::Context, Empty::utils::noncopyable
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texColor->id, 0);
 
-        const static unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
-            GL_COLOR_ATTACHMENT2 };
-        glDrawBuffers(3, attachments);
+        gBuffer->enableColorAttachments(0, 1, 2);
 
-        glBindRenderbuffer(GL_RENDERBUFFER, dBuffer->getInfo());
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, dBuffer->getInfo());
-        glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        dBuffer->setStorage(Empty::gl::RenderbufferFormat::Depth, w, h);
+        gBuffer->attachRenderbuffer<Empty::gl::FramebufferAttachment::Depth>(*dBuffer);
     }
 
 
