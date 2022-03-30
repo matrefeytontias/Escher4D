@@ -167,13 +167,12 @@ protected:
         // Render self
         if(_rc)
         {
-            _rc->_program.use();
-            _rc->_program.uniformMatrix4fv("MV", 1, mv.mat);
+            _rc->_program.uniform("MV", mv.mat);
             Empty::math::mat4 tinvmv = Empty::math::transpose(Empty::math::inverse(mv.mat));
-            _rc->_program.uniformMatrix4fv("tinvMV", 1, tinvmv);
-            _rc->_program.uniform4f("MVt", mv.pos(0), mv.pos(1), mv.pos(2), mv.pos(3));
-            _rc->_program.uniform4f("uColor", color(0), color(1), color(2), color(3));
-            _rc->_program.uniform1i("uInsideOut", insideOut);
+            _rc->_program.uniform("tinvMV", tinvmv);
+            _rc->_program.uniform("MVt", mv.pos);
+            _rc->_program.uniform("uColor", color);
+            _rc->_program.uniform("uInsideOut", (int)insideOut);
             _rc->render();
         }
         

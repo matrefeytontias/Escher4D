@@ -7,10 +7,13 @@
 #include <vector>
 
 #include <Empty/gl/Buffer.h>
+#include <Empty/gl/ShaderProgram.hpp>
+#include <Empty/gl/VertexArray.h>
+#include <Empty/gl/VertexStructure.h>
 #include <Empty/math/funcs.h>
 
+#include "Context.h"
 #include "MathUtil.hpp"
-#include "ShaderProgram.hpp"
 #include "utils.hpp"
 
 /**
@@ -205,14 +208,16 @@ struct Geometry4
     /**
      * Exposes the geometry to the GPU through a shader program.
      */
-    void exposeGPU(ShaderProgram &program)
+    void exposeGPU(Empty::gl::ShaderProgram &program)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, _vbo.getInfo());
-        if(isIndexed())
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo.getInfo());
-        program.vertexAttribPointer("aPosition", 4, GL_FLOAT, sizeof(Empty::math::vec4), 0);
-        program.vertexAttribPointer("aNormal", 4, GL_FLOAT, static_cast<int>(sizeof(Empty::math::vec4)),
-            static_cast<int>(vertices.size() * sizeof(Empty::math::vec4)));
+        Empty::gl::VertexStructure vs(vertices.size());
+        vs.add("aPosition", Empty::gl::VertexAttribType::Float, 4);
+        vs.add("aNormal", Empty::gl::VertexAttribType::Float, 4);
+        program.locateAttributes(vs);
+        _vao.attachVertexBuffer(_vbo, vs);
+        if (isIndexed())
+            _vao.attachElementBuffer(_ebo);
+        Context::get().bind(_vao);
     }
     
     /**
@@ -237,6 +242,7 @@ struct Geometry4
      */
     std::vector<Empty::math::vec4> normals;
 private:
+    Empty::gl::VertexArray _vao;
     Empty::gl::Buffer _vbo, _ebo;
 };
 

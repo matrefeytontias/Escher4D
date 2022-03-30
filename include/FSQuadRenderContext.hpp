@@ -6,6 +6,8 @@
 #include "utils.hpp"
 
 #include <Empty/gl/Buffer.h>
+#include <Empty/gl/ShaderProgram.hpp>
+#include <Empty/gl/VertexArray.h>
 
 /**
  * Full-screen quad render context. Used to render a full-screen quad to the
@@ -14,7 +16,7 @@
 class FSQuadRenderContext : public RenderContext
 {
 public:
-    FSQuadRenderContext(ShaderProgram &p) : RenderContext(p)
+    FSQuadRenderContext(Empty::gl::ShaderProgram &p) : RenderContext(p)
     {
         const static GLfloat quadV[] = {
             -1, -1,
@@ -28,21 +30,24 @@ public:
         };
         _vbo.setStorage(sizeof(quadV), Empty::gl::BufferUsage::StaticDraw, quadV);
         _ebo.setStorage(sizeof(quadT), Empty::gl::BufferUsage::StaticDraw, quadT);
-        
-        _program.use();
-        glBindBuffer(GL_ARRAY_BUFFER, _vbo.getInfo());
-        _program.vertexAttribPointer("aPosition", 2, GL_FLOAT, 0, 0);
+
+        Empty::gl::VertexStructure vs;
+
+        vs.add("aPosition", Empty::gl::VertexAttribType::Float, 2);
+        _program.locateAttributes(vs);
+        _vao.attachVertexBuffer(_vbo, vs);
+        _vao.attachElementBuffer(_ebo);
     }
     
     virtual void render() override
     {
         Context& context = Context::get();
-        context.bind(_vbo, Empty::gl::BufferTarget::Array);
-        context.bind(_ebo, Empty::gl::BufferTarget::ElementArray);
+        context.bind(_vao);
         context.drawElements(Empty::gl::PrimitiveType::Triangles, Empty::gl::ElementType::Int, 0, 6);
     }
 protected:
     Empty::gl::Buffer _vbo, _ebo;
+    Empty::gl::VertexArray _vao;
 };
 
 #endif

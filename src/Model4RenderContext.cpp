@@ -2,10 +2,11 @@
 
 #include <vector>
 
-#include "Context.h"
-#include "ShaderProgram.hpp"
+#include <Empty/gl/ShaderProgram.hpp>
 
-Model4RenderContext::Model4RenderContext(Geometry4 &geom, ShaderProgram &program)
+#include "Context.h"
+
+Model4RenderContext::Model4RenderContext(Geometry4 &geom, Empty::gl::ShaderProgram &program)
     : RenderContext(program), geometry(geom) { }
 
 void Model4RenderContext::render()

@@ -4,12 +4,12 @@
 #include <vector>
 
 #include <Empty/gl/Buffer.h>
+#include <Empty/gl/ShaderProgram.hpp>
 #include <Empty/math/vec.h>
 #include <Empty/math/mat.h>
 #include <GLFW/glfw3.h>
 
 #include "Context.h"
-#include "ShaderProgram.hpp"
 
 /**
  * Shadow hypervolumes computer. Based off of "An Efficient Alias-free Shadow
@@ -26,15 +26,17 @@ class ShadowHypervolumes
 public:
     ShadowHypervolumes()
     {
-        _aabbProgram.attach(GL_COMPUTE_SHADER, "shaders/reduction_compute.glsl");
-        _computeProgram.attach(GL_COMPUTE_SHADER, "shaders/test_compute.glsl");
+        _aabbProgram.attachFile(Empty::gl::ShaderType::Compute, "shaders/reduction_compute.glsl");
+        _aabbProgram.build();
+        _computeProgram.attachFile(Empty::gl::ShaderType::Compute, "shaders/test_compute.glsl");
+        _computeProgram.build();
     }
     
     /**
      * Re-initializes the state of the shadow volumes computer. Call this when changing
      * screen dimensions, shadow-casting tetrahedra or vertices.
      */
-    void reinit(int w, int h, Texture &texPos, std::vector<Empty::math::uvec4> &cells, std::vector<unsigned int> &objIndices, std::vector<Empty::math::vec4> &vertices)
+    void reinit(int w, int h, const Empty::gl::TextureInfo &texPos, const std::vector<Empty::math::uvec4> &cells, const std::vector<unsigned int> &objIndices, const std::vector<Empty::math::vec4> &vertices)
     {
         _w = w;
         _h = h;
@@ -53,20 +55,20 @@ public:
      * Builds the AABB hierarchy and binds the test program. Call this before
      * exposing uniforms to the test program.
      */
-    ShaderProgram &precompute()
+    Empty::gl::ShaderProgram &precompute()
     {
         Context& context = Context::get();
 
-        _aabbProgram.use();
-        _aabbProgram.uniform2i("uTexSize", _w, _h);
+        _aabbProgram.uniform("uTexSize", Empty::math::ivec2(_w, _h));
         context.bind(_aabbBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 5);
         context.memoryBarrier(Empty::gl::MemoryBarrierType::ShaderStorage);
+        context.setShaderProgram(_aabbProgram);
         context.dispatchCompute((_w + 7) / 8, (_h  + 3) / 4, 1);
         
         // Clear shadow hierarchy
         _shadowBuf.clearData<Empty::gl::DataFormat::Red, Empty::gl::DataType::UInt>(Empty::gl::BufferDataFormat::Red32ui, 0);
         
-        _computeProgram.use();
+        context.setShaderProgram(_computeProgram);
         return _computeProgram;
     }
     
@@ -77,9 +79,6 @@ public:
     void compute(std::vector<Empty::math::mat4> &ms, std::vector<Empty::math::vec4> &ts)
     {
         Context& context = Context::get();
-
-        // For good measure
-        _computeProgram.use();
         
         _matBuf.setStorage(ms.size() * sizeof(Empty::math::mat4), Empty::gl::BufferUsage::StreamDraw, ms[0]);
         _tBuf.setStorage(ts.size() * sizeof(Empty::math::vec4), Empty::gl::BufferUsage::StreamDraw, ts[0]);
@@ -93,6 +92,7 @@ public:
         context.bind(_shadowBuf, Empty::gl::IndexedBufferTarget::ShaderStorage, 6);
         
         context.memoryBarrier(Empty::gl::MemoryBarrierType::ShaderStorage);
+        context.setShaderProgram(_computeProgram);
         context.dispatchCompute(_cellsAmount, 1, 1);
     }
 
@@ -102,7 +102,7 @@ private:
     // 0 : cells, 1 : object indices, 2 : vertices, 3 : M matrices, 4 : translation
     // part of M matrices, 5 : AABB hierarchy, 6 : shadow hierarchy
     Empty::gl::Buffer _cellBuf, _objIDBuf, _vertexBuf, _matBuf, _tBuf, _aabbBuf, _shadowBuf;
-    ShaderProgram _computeProgram, _aabbProgram;
+    Empty::gl::ShaderProgram _computeProgram, _aabbProgram;
     int _w = 1, _h = 1;
     int _cellsAmount = 0;
 };

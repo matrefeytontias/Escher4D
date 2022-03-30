@@ -14,6 +14,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <Empty/Context.hpp>
+#include <Empty/gl/ShaderProgram.hpp>
 #include <Empty/math/vec.h>
 #include <Empty/math/mat.h>
 
@@ -23,7 +24,6 @@
 #include "HierarchicalBuffer.hpp"
 #include "OFFLoader.hpp"
 #include "Object4.hpp"
-#include "ShaderProgram.hpp"
 #include "ShadowHypervolumes.hpp"
 #include "utils.hpp"
 
@@ -65,10 +65,11 @@ int _main(int, char *argv[])
     camera.pos = Empty::math::vec4(0.f, 1.5f, 0.f, 0.f);
     
     Empty::math::mat4 p = Empty::math::mat4::Identity();
-    ShaderProgram program;
-    program.attach(GL_VERTEX_SHADER, "shaders/vertex.glsl");
-    program.attach(GL_GEOMETRY_SHADER, "shaders/geometry.glsl");
-    program.attach(GL_FRAGMENT_SHADER, "shaders/fragment.glsl");
+    Empty::gl::ShaderProgram program;
+    program.attachFile(Empty::gl::ShaderType::Vertex, "shaders/vertex.glsl");
+    program.attachFile(Empty::gl::ShaderType::Geometry, "shaders/geometry.glsl");
+    program.attachFile(Empty::gl::ShaderType::Fragment, "shaders/fragment.glsl");
+    program.build();
     
     // Load geometry
     Geometry4 cubeGeometry, holedGeometry;
@@ -172,12 +173,13 @@ int _main(int, char *argv[])
     complex.scale(Empty::math::vec4(10, 6, 10, 10)).pos(1) = 3;
     
     /// Setup deferred shading
-    ShaderProgram quadProgram;
-    quadProgram.attach(GL_VERTEX_SHADER, "shaders/deferred_vert.glsl");
-    quadProgram.attach(GL_FRAGMENT_SHADER, "shaders/deferred_frag.glsl");
-    context.texPos = &quadProgram.getTexture("texPos");
-    context.texNorm = &quadProgram.getTexture("texNorm");
-    context.texColor = &quadProgram.getTexture("texColor");
+    Empty::gl::ShaderProgram quadProgram;
+    quadProgram.attachFile(Empty::gl::ShaderType::Vertex, "shaders/deferred_vert.glsl");
+    quadProgram.attachFile(Empty::gl::ShaderType::Fragment, "shaders/deferred_frag.glsl");
+    quadProgram.build();
+    quadProgram.registerTexture("texPos", *context.texPos);
+    quadProgram.registerTexture("texNorm", *context.texNorm);
+    quadProgram.registerTexture("texColor", *context.texColor);
     
     FSQuadRenderContext quadRC(quadProgram);
     
@@ -258,15 +260,15 @@ int _main(int, char *argv[])
         Transform4 vt = camera.computeViewTransform();
         lightPos = vt.apply(lightPos);
         
-        program.use();
+        context.setShaderProgram(program);
         
-        program.uniformMatrix4fv("P", 1, p);
+        program.uniform("P", p);
         
         Object4::scene.render(camera);
         
         /// GPGPU fun
         // Generate AABB hierarchy and bind test program
-        ShaderProgram &computeProgram = svComputer.precompute();
+        Empty::gl::ShaderProgram &computeProgram = svComputer.precompute();
         
         // Compute M transforms (matrix + translation) for all meshes
         MCompBuffer.clear();
@@ -283,11 +285,11 @@ int _main(int, char *argv[])
         }
         
         // Bind textures and whatnot
-        glBindImageTexture(0, context.texPos->id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-        computeProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
-        computeProgram.uniform2i("uTexSize", context.frameWidth, context.frameHeight);
-        computeProgram.uniformMatrix4fv("V", 1, vt.mat);
-        computeProgram.uniform4f("Vt", vt.pos(0), vt.pos(1), vt.pos(2), vt.pos(3));
+        glBindImageTexture(0, context.texPos->getInfo(), 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+        computeProgram.uniform("uLightPos", lightPos);
+        computeProgram.uniform("uTexSize", Empty::math::ivec2(context.frameWidth, context.frameHeight));
+        computeProgram.uniform("V", vt.mat);
+        computeProgram.uniform("Vt", vt.pos);
         // Perform the actual computation
         svComputer.compute(MCompBuffer, MtCompBuffer);
         
@@ -295,11 +297,11 @@ int _main(int, char *argv[])
         context.setFramebuffer(Empty::gl::Framebuffer::dflt, Empty::gl::FramebufferTarget::DrawRead, context.frameWidth, context.frameHeight);
         Empty::gl::Framebuffer::dflt.clearAttachment<Empty::gl::FramebufferAttachment::Color>(0, Empty::math::vec4::zero);
         Empty::gl::Framebuffer::dflt.clearAttachment<Empty::gl::FramebufferAttachment::Depth>(1.f);
-        quadProgram.use();
-        quadProgram.uniform1f("uLightIntensity", lightIntensity);
-        quadProgram.uniform1f("uLightRadius", lightRadius);
-        quadProgram.uniform4f("uLightPos", lightPos(0), lightPos(1), lightPos(2), lightPos(3));
-        quadProgram.uniform2i("uTexSize", context.frameWidth, context.frameHeight);
+        context.setShaderProgram(quadProgram);
+        quadProgram.uniform("uLightIntensity", lightIntensity);
+        quadProgram.uniform("uLightRadius", lightRadius);
+        quadProgram.uniform("uLightPos", lightPos);
+        quadProgram.uniform("uTexSize", Empty::math::ivec2(context.frameWidth, context.frameHeight));
         context.memoryBarrier(Empty::gl::MemoryBarrierType::ShaderStorage);
         quadRC.render();
         

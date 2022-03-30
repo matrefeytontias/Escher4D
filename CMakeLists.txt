@@ -16,7 +16,6 @@ set(SOURCES ${SOURCES}
     include/OFFLoader.hpp
     include/RenderContext.hpp
     # include/Rotor4.hpp
-    include/ShaderProgram.hpp
     include/ShadowHypervolumes.hpp
     include/Transform4.hpp
     include/utils.hpp
@@ -27,7 +26,6 @@ set(SOURCES ${SOURCES}
     src/main.cpp
     src/MathUtil.cpp
     src/Model4RenderContext.cpp
-    src/ShaderProgram.cpp
     src/utils.cpp)
 
 add_executable(EscherDemo ${SOURCES})

@@ -2,6 +2,7 @@
 
 #include <Empty/Context.hpp>
 #include <Empty/gl/Framebuffer.h>
+#include <Empty/gl/Texture.h>
 #include <Empty/gl/Renderbuffer.h>
 #include <Empty/utils/macros.h>
 #include <Empty/utils/noncopyable.h>
@@ -10,8 +11,6 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-
-#include "ShaderProgram.hpp"
 
 struct Context : public Empty::Context, Empty::utils::noncopyable
 {
@@ -68,6 +67,9 @@ struct Context : public Empty::Context, Empty::utils::noncopyable
         /// Create context resources
         gBuffer = std::make_unique<Empty::gl::Framebuffer>();
         dBuffer = std::make_unique<Empty::gl::Renderbuffer>();
+        texPos = std::make_unique<decltype(texPos)::element_type>();
+        texNorm = std::make_unique<decltype(texNorm)::element_type>();
+        texColor = std::make_unique<decltype(texColor)::element_type>();
 
         _init = true;
         return true;
@@ -79,30 +81,27 @@ struct Context : public Empty::Context, Empty::utils::noncopyable
      */
     void setupDeferred(int w, int h)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer->getInfo());
+        texPos->setStorage(1, w, h);
+        texPos->setParameter<Empty::gl::TextureParam::MinFilter>(Empty::gl::TextureParamValue::FilterNearest);
+        texPos->setParameter<Empty::gl::TextureParam::MagFilter>(Empty::gl::TextureParamValue::FilterNearest);
+        gBuffer->attachTexture<Empty::gl::FramebufferAttachment::Color>(0, *texPos, 0);
 
-        glBindTexture(GL_TEXTURE_2D, texPos->id);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texPos->id, 0);
+        texNorm->setStorage(1, w, h);
+        texNorm->setParameter<Empty::gl::TextureParam::MinFilter>(Empty::gl::TextureParamValue::FilterNearest);
+        texNorm->setParameter<Empty::gl::TextureParam::MagFilter>(Empty::gl::TextureParamValue::FilterNearest);
+        gBuffer->attachTexture<Empty::gl::FramebufferAttachment::Color>(1, *texNorm, 0);
 
-        glBindTexture(GL_TEXTURE_2D, texNorm->id);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8_SNORM, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texNorm->id, 0);
-
-        glBindTexture(GL_TEXTURE_2D, texColor->id);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texColor->id, 0);
+        texColor->setStorage(1, w, h);
+        texColor->setParameter<Empty::gl::TextureParam::MinFilter>(Empty::gl::TextureParamValue::FilterNearest);
+        texColor->setParameter<Empty::gl::TextureParam::MagFilter>(Empty::gl::TextureParamValue::FilterNearest);
+        gBuffer->attachTexture<Empty::gl::FramebufferAttachment::Color>(2, *texColor, 0);
 
         gBuffer->enableColorAttachments(0, 1, 2);
 
         dBuffer->setStorage(Empty::gl::RenderbufferFormat::Depth, w, h);
         gBuffer->attachRenderbuffer<Empty::gl::FramebufferAttachment::Depth>(*dBuffer);
+
+        TRACE("Framebuffer status : " << Empty::utils::name(gBuffer->checkStatus(Empty::gl::FramebufferTarget::DrawRead)));
     }
 
 
@@ -139,7 +138,9 @@ struct Context : public Empty::Context, Empty::utils::noncopyable
     // Deferred rendering buffers and textures
     std::unique_ptr<Empty::gl::Framebuffer> gBuffer;
     std::unique_ptr<Empty::gl::Renderbuffer> dBuffer;
-    Texture* texPos, * texNorm, * texColor;
+    std::unique_ptr<Empty::gl::Texture<Empty::gl::TextureTarget::Texture2D, Empty::gl::TextureFormat::RGBA16f>> texPos;
+    std::unique_ptr<Empty::gl::Texture<Empty::gl::TextureTarget::Texture2D, Empty::gl::TextureFormat::RGBA8s>> texNorm;
+    std::unique_ptr<Empty::gl::Texture<Empty::gl::TextureTarget::Texture2D, Empty::gl::TextureFormat::RGBA8>> texColor;
 
 private:
     Context() : Empty::Context(), Empty::utils::noncopyable(), frameWidth(0), frameHeight(0), window(nullptr), _init(false) { }
