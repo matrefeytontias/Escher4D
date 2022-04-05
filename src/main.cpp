@@ -285,7 +285,7 @@ int _main(int, char *argv[])
         }
         
         // Bind textures and whatnot
-        glBindImageTexture(0, context.texPos->getInfo(), 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+        context.bind(context.texPos->getLevel(0), 0, Empty::gl::AccessPolicy::ReadOnly, Empty::gl::TextureFormat::RGBA16f);
         computeProgram.uniform("uLightPos", lightPos);
         computeProgram.uniform("uTexSize", Empty::math::ivec2(context.frameWidth, context.frameHeight));
         computeProgram.uniform("V", vt.mat);
