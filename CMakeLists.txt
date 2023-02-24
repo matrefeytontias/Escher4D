@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.13)
 
 project(Escher4D LANGUAGES C CXX)
 
-set(SOURCES ${SOURCES}
+set(SOURCES
     include/Camera4.hpp
     include/Context.h
     include/FSQuadRenderContext.hpp
@@ -36,9 +36,35 @@ target_include_directories(EscherDemo PUBLIC include)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT EscherDemo)
 
-add_custom_target(CopyResources ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/res ${CMAKE_BINARY_DIR}
-    DEPENDS EscherDemo)
+# Resource generation
+
+set(MODELS
+    res/models/cube
+    res/models/holedCube
+    res/models/socket
+    res/models/sphere)
+
+foreach(MODEL ${MODELS})
+    set(IN ${CMAKE_CURRENT_SOURCE_DIR}/${MODEL})
+    set(OUT ${IN}.ele ${IN}.face)
+    message(STATUS ${IN}.off)
+    add_custom_command(
+        OUTPUT ${OUT}
+        DEPENDS ${MODEL}.off
+        COMMAND $<TARGET_FILE:tetgen> -pYBNIQ ${IN}.off
+    )
+    list(APPEND MODELS_OUT ${OUT})
+endforeach()
+
+add_custom_target(
+    GenerateResources ALL
+    DEPENDS ${MODELS_OUT}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/res ${PROJECT_BINARY_DIR}
+)
+
+# Dependency setup
+
+add_dependencies(EscherDemo GenerateResources)
 
 ### Third-party libraries
 
