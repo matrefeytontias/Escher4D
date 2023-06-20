@@ -5,3 +5,5 @@ deps/
 obj/
 *.face
 *.ele
+*.edge
+*.smesh
